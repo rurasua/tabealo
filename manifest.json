@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "TabVault",
+  "version": "1.0.0",
+  "description": "Gestor de pestañas y bookmarks local. Tus datos en tu maquina, sin servidor, sin cuenta.",
+  "permissions": ["tabs", "tabGroups", "storage", "unlimitedStorage"],
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "TabVault - guardar esta pestana"
+  }
+}

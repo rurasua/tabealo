@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TabVault</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ============ TOOLBAR SUPERIOR ============ -->
+<header class="toolbar">
+  <div class="toolbar-left">
+    <button class="icon-btn" id="btnSidebar" title="Mostrar/ocultar panel">☰</button>
+    <span class="logo">TabVault</span>
+  </div>
+
+  <div class="toolbar-center">
+    <input type="search" id="search" placeholder="Buscar...  #colecciones  %todo  ?google  !chatgpt  @tag" autocomplete="off">
+  </div>
+
+  <div class="toolbar-right">
+    <button class="icon-btn" id="btnBoard" title="Vista tablero">▦</button>
+    <button class="icon-btn" id="btnCanvas" title="Vista mapa">◉</button>
+    <button class="icon-btn" id="btnZen" title="Modo zen">☯</button>
+    <button class="icon-btn" id="btnTheme" title="Tema claro/oscuro">◐</button>
+    <button class="icon-btn" id="btnSettings" title="Ajustes">⚙</button>
+  </div>
+</header>
+
+<!-- ============ LAYOUT PRINCIPAL ============ -->
+<div class="layout">
+
+  <!-- SIDEBAR: espacios > colecciones -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-actions">
+      <button class="btn btn-primary" id="btnImport">Importar</button>
+      <button class="btn" id="btnExport">Exportar</button>
+      <button class="btn" id="btnNewCollection">+ Nueva</button>
+    </div>
+
+    <!-- Menú desplegable de "+ Nueva" -->
+    <div class="new-menu" id="newMenu">
+      <button class="new-menu-item" id="menuNewCollection">
+        <span class="new-menu-icon">🗂</span>
+        <span class="new-menu-text">
+          <span class="new-menu-title">Nuevo Grupo</span>
+          <span class="new-menu-desc">Un espacio nuevo para agrupar colecciones</span>
+        </span>
+      </button>
+      <button class="new-menu-item" id="menuNewFolder">
+        <span class="new-menu-icon">📁</span>
+        <span class="new-menu-text">
+          <span class="new-menu-title">Nueva Carpeta</span>
+          <span class="new-menu-desc">Dentro de la colección seleccionada</span>
+        </span>
+      </button>
+    </div>
+    <div class="sidebar-stats" id="stats"></div>
+    <div class="sidebar-list" id="sidebarList"></div>
+  </aside>
+
+  <!-- CONTENIDO PRINCIPAL -->
+  <main class="main" id="main">
+    <div class="empty" id="emptyState">
+      <div class="empty-icon">📦</div>
+      <h1>TabVault</h1>
+      <p>Tus bookmarks viven solo en este navegador. Sin cuentas, sin servidores, sin cobros.</p>
+      <button class="btn btn-primary btn-lg" id="btnImportEmpty">Importar JSON de Toby</button>
+      <p class="empty-hint">Puedes importar el archivo <code>toby-export-*.json</code> directamente.</p>
+    </div>
+
+    <!-- Vista tablero: grid de colecciones -->
+    <div class="board" id="board"></div>
+
+    <!-- Vista canvas: mapa visual -->
+    <div class="canvas-wrap" id="canvasWrap">
+      <svg id="canvas" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="canvas-controls">
+        <button class="icon-btn" id="zoomIn">+</button>
+        <button class="icon-btn" id="zoomOut">−</button>
+        <button class="icon-btn" id="zoomFit">⤢</button>
+      </div>
+      <div class="canvas-hint">Click en un espacio para ver sus colecciones · arrastra el fondo para moverte · rueda para zoom</div>
+    </div>
+  </main>
+
+  <!-- PANEL DE PESTANAS ABIERTAS -->
+  <aside class="tabs-panel" id="tabsPanel">
+    <div class="tabs-header">
+      <span>Pestañas abiertas</span>
+      <button class="icon-btn" id="btnRefreshTabs" title="Actualizar">↻</button>
+      <button class="icon-btn" id="btnCloseTabsPanel">✕</button>
+    </div>
+    <div class="tabs-actions">
+      <button class="btn btn-sm" id="btnCaptureWindow">Capturar ventana</button>
+    </div>
+    <div class="tabs-list" id="openTabsList"></div>
+  </aside>
+</div>
+
+<!-- ============ MODO ZEN ============ -->
+<div class="zen" id="zen">
+  <div class="zen-clock" id="zenClock"></div>
+  <input type="search" id="zenSearch" placeholder="Buscar..." autocomplete="off">
+  <div class="zen-results" id="zenResults"></div>
+  <button class="btn btn-sm zen-exit" id="zenExit">Salir (Esc)</button>
+</div>
+
+<!-- ============ MODAL AJUSTES ============ -->
+<div class="modal-backdrop" id="settingsModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Ajustes</h2>
+      <button class="icon-btn" id="btnCloseSettings">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <section class="settings-section">
+        <h3>Sincronizacion con GitHub</h3>
+        <p class="settings-hint">Tus datos se guardan en un repo PRIVADO tuyo. Ningun servidor externo los ve.</p>
+        <label>Usuario de GitHub
+          <input type="text" id="ghUser" placeholder="tu-usuario">
+        </label>
+        <label>Nombre del repositorio
+          <input type="text" id="ghRepo" placeholder="mis-bookmarks">
+        </label>
+        <label>Personal Access Token
+          <input type="password" id="ghToken" placeholder="ghp_...">
+          <small>Necesita solo permiso <code>repo</code>. Se genera en GitHub → Settings → Developer settings.</small>
+        </label>
+        <label>Rama
+          <input type="text" id="ghBranch" value="main">
+        </label>
+        <div class="settings-row">
+          <button class="btn" id="btnPush">Subir a GitHub</button>
+          <button class="btn" id="btnPull">Bajar de GitHub</button>
+          <span class="settings-status" id="syncStatus"></span>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h3>Datos locales</h3>
+        <div class="settings-row">
+          <button class="btn" id="btnExportSettings">Exportar JSON</button>
+          <button class="btn" id="btnImportSettings">Importar JSON</button>
+        </div>
+        <div class="settings-row">
+          <button class="btn btn-danger" id="btnWipe">Borrar todo</button>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h3>Apariencia</h3>
+        <label>Fondo
+          <input type="file" id="bgUpload" accept="image/*">
+        </label>
+        <button class="btn btn-sm" id="btnClearBg">Quitar fondo</button>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL GENERICO ============ -->
+<div class="modal-backdrop" id="genericModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="genericTitle">Titulo</h2>
+      <button class="icon-btn" id="btnCloseGeneric">✕</button>
+    </div>
+    <div class="modal-body" id="genericBody"></div>
+  </div>
+</div>
+
+<input type="file" id="filePicker" accept=".json" hidden>
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
