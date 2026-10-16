@@ -3,7 +3,12 @@
   "name": "TabVault",
   "version": "1.0.0",
   "description": "Gestor de pestañas y bookmarks local. Tus datos en tu maquina, sin servidor, sin cuenta.",
-  "permissions": ["tabs", "tabGroups", "storage", "unlimitedStorage"],
+  "permissions": [
+    "tabs",
+    "tabGroups",
+    "storage",
+    "unlimitedStorage"
+  ],
   "chrome_url_overrides": {
     "newtab": "newtab.html"
   },
