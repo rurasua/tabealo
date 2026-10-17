@@ -588,6 +588,13 @@ function bindSidebar() {
 }
 
 /* ---- TABLERO ---- */
+
+/* Notas desplegadas y nota en edicion.
+   Son estado de VISTA, no del usuario: no se guardan en storage, asi que
+   al recargar la pagina todo vuelve a su estado normal. */
+const notasAbiertas = new Set();
+let notaEnEdicion = null;
+
 function renderBoard() {
   const q = state.ui.search.trim();
   const board = document.getElementById('board');
@@ -610,18 +617,45 @@ function renderBoard() {
     const space = state.spaces.find(s => s.id === col.spaceId);
     const bms = (col.bookmarks || []).map(id => state.bookmarks[id]).filter(Boolean);
 
-    const rowHtml = (bm) => `
+    // Cada enlace ocupa TRES bloques: su fila, el panel de la nota
+    // desplegada y el editor para escribirla. Van juntos para que la nota
+    // aparezca justo debajo de la fila que le pertenece.
+    const rowHtml = (bm) => {
+      const nota = (bm.note || '').trim();
+      const abierta = notasAbiertas.has(bm.id);
+      const editando = notaEnEdicion === bm.id;
+      return `
       <div class="bm-row" data-bm="${bm.id}" data-url="${esc(bm.url)}" draggable="true">
         <img class="bm-icon" src="${esc(bm.icon)}" onerror="this.style.visibility='hidden'" alt="">
         <div class="bm-text">
           <div class="bm-title">${esc(bm.title)}</div>
           <div class="bm-url">${esc(bm.url.replace(/^https?:\/\//, '').slice(0, 60))}</div>
         </div>
+        ${nota
+          ? `<button class="bm-note-toggle ${abierta ? 'open' : ''}" data-act="toggle-note" data-bm="${bm.id}" title="Mostrar u ocultar la nota">
+               <span class="caret">▶</span> Notas
+             </button>`
+          : ''}
         <div class="bm-tools">
+          <button class="icon-btn bm-note-btn ${nota ? 'has-note' : ''}" data-act="edit-note" data-bm="${bm.id}" title="Añadir nota">🗒</button>
           <button class="icon-btn bm-edit" data-act="edit-bm" data-bm="${bm.id}" title="Renombrar">✎</button>
           <button class="icon-btn bm-del" data-act="delete-bm" data-bm="${bm.id}" title="Eliminar">✕</button>
         </div>
+      </div>
+      ${nota
+        ? `<div class="bm-note-panel ${abierta ? 'open' : ''}">
+             <div class="bm-note-text">${esc(nota)}</div>
+           </div>`
+        : ''}
+      <div class="bm-note-editor ${editando ? 'open' : ''}">
+        <textarea data-note-ta="${bm.id}" placeholder="Escribe tu nota aqui...">${esc(nota)}</textarea>
+        <div class="bm-note-actions">
+          <span class="hint">Ctrl+Enter para guardar · Escape para cancelar</span>
+          <button class="btn btn-sm" data-act="cancel-note" data-bm="${bm.id}">Cancelar</button>
+          <button class="btn btn-sm btn-primary" data-act="save-note" data-bm="${bm.id}">Guardar</button>
+        </div>
       </div>`;
+    };
 
     const contentHtml = bms.length
       ? bms.map(bm => rowHtml(bm)).join('')
@@ -695,11 +729,72 @@ function bindBoard() {
 
       if (act === 'delete-bm') deleteBookmark(bmId);
       if (act === 'edit-bm') startEditTitle(bmId);
+      if (act === 'edit-note') startEditNote(bmId);
+      if (act === 'save-note') saveNote(bmId);
+      if (act === 'cancel-note') cancelNote();
+      if (act === 'toggle-note') toggleNote(bmId);
       if (act === 'delete-col') deleteCollection(colId);
       if (act === 'open-group') openCollectionAsGroup(colId);
       if (act === 'open-all') openCollectionAsGroup(colId);
     });
   });
+
+  /* Atajos del editor de nota: Ctrl+Enter guarda, Escape cancela.
+     Van aparte porque el keydown general de la app usa Escape para limpiar
+     la busqueda, y aqui Escape debe cerrar solo el editor. */
+  document.querySelectorAll('#board [data-note-ta]').forEach(ta => {
+    ta.addEventListener('keydown', e => {
+      e.stopPropagation();
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        saveNote(ta.dataset.noteTa);
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        cancelNote();
+      }
+    });
+  });
+}
+
+/* ---- NOTAS ---- */
+function startEditNote(bmId) {
+  notaEnEdicion = bmId;
+  render();
+  const ta = document.querySelector(`#board [data-note-ta="${bmId}"]`);
+  if (ta) {
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+  }
+}
+
+function saveNote(bmId) {
+  const ta = document.querySelector(`#board [data-note-ta="${bmId}"]`);
+  const bm = state.bookmarks[bmId];
+  if (!ta || !bm) { notaEnEdicion = null; return; }
+
+  const nota = ta.value.trim();
+  bm.note = nota;
+  notaEnEdicion = null;
+
+  // Al guardar, la nota se muestra de una vez para que veas lo que quedo
+  if (nota) notasAbiertas.add(bmId);
+  else notasAbiertas.delete(bmId);
+
+  save();
+  render();
+  toast(nota ? 'Nota guardada' : 'Nota borrada');
+}
+
+function cancelNote() {
+  notaEnEdicion = null;
+  render();
+}
+
+function toggleNote(bmId) {
+  if (notasAbiertas.has(bmId)) notasAbiertas.delete(bmId);
+  else notasAbiertas.add(bmId);
+  render();
 }
 
 /* ---- CANVAS (mapa visual con drill-down) ----
