@@ -258,10 +258,34 @@ body.tabs-hidden .tabs-panel { margin-right: calc(-1 * var(--tabs-w)); }
   opacity: 0;
   transition: all .15s;
 }
-.office-header:hover .office-add-dept { opacity: 1; }
+.office-header:hover .office-add-dept,
+.office-header:hover .office-del { opacity: 1; }
 .office-add-dept:hover {
   background: var(--accent);
   border-color: var(--accent);
+  color: #fff;
+  transform: scale(1.12);
+}
+
+/* Boton de papelera de una Oficina */
+.office-del {
+  width: 20px; height: 20px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: all .15s;
+}
+.office-del:hover {
+  background: var(--danger, #e0563a);
+  border-color: var(--danger, #e0563a);
   color: #fff;
   transform: scale(1.12);
 }
@@ -333,10 +357,34 @@ body.tabs-hidden .tabs-panel { margin-right: calc(-1 * var(--tabs-w)); }
   opacity: 0;
   transition: all .15s;
 }
-.space-header:hover .space-add { opacity: 1; }
+.space-header:hover .space-add,
+.space-header:hover .space-del { opacity: 1; }
 .space-add:hover {
   background: var(--accent);
   border-color: var(--accent);
+  color: #fff;
+  transform: scale(1.12);
+}
+
+/* Boton de papelera de un Departamento */
+.space-del {
+  width: 20px; height: 20px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: all .15s;
+}
+.space-del:hover {
+  background: var(--danger, #e0563a);
+  border-color: var(--danger, #e0563a);
   color: #fff;
   transform: scale(1.12);
 }

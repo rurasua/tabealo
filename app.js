@@ -403,6 +403,7 @@ function renderSidebar() {
           <span class="office-tag">${office.shared ? 'compartida' : 'privada'}</span>
           <span class="office-count">${depts.length}</span>
           <button class="office-add-dept" data-act="add-department" data-office="${office.id}" title="Nuevo departamento">+</button>
+          <button class="office-del" data-act="delete-office" data-office="${office.id}" title="Eliminar oficina">🗑</button>
         </div>
         <div class="office-body">
           ${depts.length === 0
@@ -420,6 +421,7 @@ function renderSidebar() {
                     <span class="space-name">${esc(space.name)}</span>
                     <span class="space-count">${total}</span>
                     <button class="space-add" data-act="add-collection" data-space="${space.id}" title="Nuevo escritorio">+</button>
+                    <button class="space-del" data-act="delete-department" data-space="${space.id}" title="Eliminar departamento">🗑</button>
                   </div>
                   <div class="space-collections">
                     ${cols.map(col => `
@@ -455,6 +457,7 @@ function bindSidebar() {
   document.querySelectorAll('.office-header').forEach(h => {
     h.addEventListener('click', e => {
       if (e.target.closest('.office-add-dept')) return;
+      if (e.target.closest('.office-del')) return;
       const of = h.parentElement;
       const id = of.dataset.office;
       const abriendo = !of.classList.contains('open');
@@ -498,6 +501,7 @@ function bindSidebar() {
   document.querySelectorAll('#sidebarList .space-header').forEach(h => {
     h.addEventListener('click', e => {
       if (e.target.closest('.space-add')) return;
+      if (e.target.closest('.space-del')) return;
       const sp = h.parentElement;
       const id = sp.dataset.space;
       const abriendo = !sp.classList.contains('open');
@@ -528,6 +532,22 @@ function bindSidebar() {
       state.ui.selectedSpace = spaceId;
       save(); render();
       toast('Escritorio creado');
+    });
+  });
+
+  // Boton de papelera de cada Oficina: eliminarla con todo su contenido
+  document.querySelectorAll('#sidebarList .office-del').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      deleteOffice(btn.dataset.office);
+    });
+  });
+
+  // Boton de papelera de cada Departamento
+  document.querySelectorAll('#sidebarList .space-del').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      deleteDepartment(btn.dataset.space);
     });
   });
 
@@ -939,6 +959,88 @@ function deleteCollection(colId) {
     state.ui.selectedCollection = null;
   }
   save(); render();
+}
+
+/* CuentaDepartamentos, Escritorios y enlaces que hay bajo un Departamento */
+function countOfDepartment(spaceId) {
+  const cols = state.collections.filter(c => c.spaceId === spaceId);
+  return {
+    escritorios: cols.length,
+    enlaces: cols.reduce((n, c) => n + colTotal(c), 0)
+  };
+}
+
+/* Cuenta lo que hay bajo una Oficina */
+function countOfOffice(officeId) {
+  const depts = state.spaces.filter(s => s.officeId === officeId);
+  const cuentas = depts.map(d => countOfDepartment(d.id));
+  return {
+    departamentos: depts.length,
+    escritorios: cuentas.reduce((n, c) => n + c.escritorios, 0),
+    enlaces: cuentas.reduce((n, c) => n + c.enlaces, 0)
+  };
+}
+
+/* Escribe "3 departamentos, 5 escritorios y 12 enlaces" para el confirm */
+function describeCounts(c) {
+  const partes = [];
+  if (c.departamentos) partes.push(`${c.departamentos} ${c.departamentos === 1 ? 'departamento' : 'departamentos'}`);
+  if (c.escritorios) partes.push(`${c.escritorios} ${c.escritorios === 1 ? 'escritorio' : 'escritorios'}`);
+  if (c.enlaces) partes.push(`${c.enlaces} ${c.enlaces === 1 ? 'enlace' : 'enlaces'}`);
+  if (partes.length <= 1) return partes.join('');
+  return partes.slice(0, -1).join(', ') + ' y ' + partes[partes.length - 1];
+}
+
+/* Elimina un Departamento con todos sus Escritorios y enlaces */
+function deleteDepartment(spaceId) {
+  const space = state.spaces.find(s => s.id === spaceId);
+  if (!space) return;
+  const c = countOfDepartment(spaceId);
+
+  // Sin contenido no hace falta preguntar nada
+  if (c.escritorios > 0) {
+    const detalle = describeCounts(c);
+    if (!confirm(`¿Eliminar el departamento "${space.name}"?\n\nTambién se borran ${detalle}.\nNo se puede deshacer.`)) return;
+  } else if (!confirm(`¿Eliminar el departamento "${space.name}"?`)) return;
+
+  const cols = state.collections.filter(x => x.spaceId === spaceId);
+  cols.forEach(col => allBookmarksOf(col).forEach(bm => delete state.bookmarks[bm.id]));
+  state.collections = state.collections.filter(x => x.spaceId !== spaceId);
+  state.spaces = state.spaces.filter(s => s.id !== spaceId);
+
+  if (state.ui.selectedSpace === spaceId) state.ui.selectedSpace = null;
+  if (cols.some(x => x.id === state.ui.selectedCollection)) state.ui.selectedCollection = null;
+
+  save(); render();
+  toast('Departamento eliminado');
+}
+
+/* Elimina una Oficina con todos sus Departamentos, Escritorios y enlaces */
+function deleteOffice(officeId) {
+  const office = state.offices.find(o => o.id === officeId);
+  if (!office) return;
+  const c = countOfOffice(officeId);
+
+  if (c.departamentos > 0) {
+    const detalle = describeCounts(c);
+    if (!confirm(`¿Eliminar la oficina "${office.name}"?\n\nTambién se borran ${detalle}.\nNo se puede deshacer.`)) return;
+  } else if (!confirm(`¿Eliminar la oficina "${office.name}"?`)) return;
+
+  const depts = state.spaces.filter(s => s.officeId === officeId);
+  const deptIds = new Set(depts.map(d => d.id));
+  const cols = state.collections.filter(x => deptIds.has(x.spaceId));
+  cols.forEach(col => allBookmarksOf(col).forEach(bm => delete state.bookmarks[bm.id]));
+
+  state.collections = state.collections.filter(x => !deptIds.has(x.spaceId));
+  state.spaces = state.spaces.filter(s => s.officeId !== officeId);
+  state.offices = state.offices.filter(o => o.id !== officeId);
+
+  if (state.ui.selectedOffice === officeId) state.ui.selectedOffice = null;
+  if (depts.some(d => d.id === state.ui.selectedSpace)) state.ui.selectedSpace = null;
+  if (cols.some(x => x.id === state.ui.selectedCollection)) state.ui.selectedCollection = null;
+
+  save(); render();
+  toast('Oficina eliminada');
 }
 
 /* Paleta de circulos para Escritorios y Departamentos */
