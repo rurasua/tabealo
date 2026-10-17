@@ -8,7 +8,8 @@ Inspirado en la idea de TheTab.Ninja y en las funcionalidades de Toby, pero con 
 
 ## Qué hace
 
-- **Importa el export JSON de Toby** (soporta v4): tus 22 Departamentos, 182 Escritorios y 1,270 enlaces entran en un click.
+- **Importa el export JSON de Toby** (soporta v4): tus 22 Departamentos, 182 Escritorios y 1,270 enlaces entran en un click. Las descripciones de Toby se conservan como **notas**.
+- **Notas por enlace**: escribe, cambia y borra una nota en cualquier enlace. Las que ya trae Toby aparecen con una pastilla para desplegar.
 - **Panel de pestañas abiertas**: arrastra cualquier pestaña abierta a un Escritorio y se guarda.
 - **Capturar ventana completa**: convierte todo lo que tienes abierto en un Escritorio nuevo.
 - **Reabrir Escritorio como grupo de pestañas** de Chrome.
@@ -93,6 +94,25 @@ El importador mapea así:
 | `groups` | Departamentos (dentro de una sola Oficina llamada "Importado de Toby") |
 | `lists` | Escritorios |
 | `cards` | Enlaces, directos en su Escritorio |
+
+Las `customDescription` de Toby se importan como **notas** del enlace, y el campo `note` las guarda.
+
+---
+
+## Notas de un enlace
+
+Cada enlace tiene una nota opcional, guardada en su campo `note`.
+
+| Botón | Qué hace |
+|---|---|
+| **🗒** | Abre el editor para escribir o cambiar la nota |
+| **▶ Notas** | Despliega u oculta la nota (solo aparece si ya tiene una) |
+
+Al guardar, la nota se despliega al instante para que veas lo que quedó. `Ctrl+Enter` guarda y `Escape` cancela sin guardar nada.
+
+Si un enlace ya tiene nota, su 🗒 se queda siempre visible en color de acento, para que de un vistazo sepas cuáles tienen algo escrito.
+
+Las notas **no se guardan** en el estado de la vista: al recargar la página vuelven a estar plegadas. El texto de la nota sí se guarda, en `chrome.storage.local` y en el `tablealo.json` que sube GitHub.
 
 ---
 
