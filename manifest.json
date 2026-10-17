@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "TabVault",
+  "name": "Tablealo",
   "version": "1.0.0",
   "description": "Gestor de pestañas y bookmarks local. Tus datos en tu maquina, sin servidor, sin cuenta.",
   "permissions": [
@@ -16,6 +16,6 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "TabVault - guardar esta pestana"
+    "default_title": "Tablealo - guardar esta pestaña"
   }
 }

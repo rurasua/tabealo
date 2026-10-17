@@ -1,5 +1,5 @@
 /* ================================================================
-   TabVault - Gestor de pestanas y bookmarks
+   Tablealo - Gestor de pestañas y bookmarks
    Datos 100% locales. Sin servidor, sin cuenta, sin cobros.
 
    ARQUITECTURA:
@@ -141,7 +141,7 @@ function exportData() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `tabvault-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.download = `tablealo-backup-${new Date().toISOString().slice(0,10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
   toast('Backup descargado');
@@ -178,18 +178,18 @@ async function ghPush() {
   try {
     const { branch } = state.settings.gh;
     const content = btoa(unescape(encodeURIComponent(JSON.stringify(state, null, 2))));
-    const existing = await ghRequest('GET', 'tabvault.json');
+    const existing = await ghRequest('GET', 'tablealo.json');
 
     if (existing && existing.sha) {
-      await ghRequest('PUT', 'tabvault.json', {
-        message: 'TabVault sync',
+      await ghRequest('PUT', 'tablealo.json', {
+        message: 'Tablealo sync',
         content,
         sha: existing.sha,
         branch
       });
     } else {
-      await ghRequest('PUT', 'tabvault.json', {
-        message: 'TabVault sync inicial',
+      await ghRequest('PUT', 'tablealo.json', {
+        message: 'Tablealo sync inicial',
         content,
         branch
       });
@@ -204,7 +204,7 @@ async function ghPush() {
 async function ghPull() {
   setSyncStatus('Descargando...');
   try {
-    const data = await ghRequest('GET', 'tabvault.json');
+    const data = await ghRequest('GET', 'tablealo.json');
     if (!data || !data.content) {
       setSyncStatus('No hay datos en GitHub', 'err');
       return;

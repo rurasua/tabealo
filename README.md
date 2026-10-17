@@ -1,4 +1,4 @@
-# TabVault
+# Tablealo
 
 Gestor de pestañas y bookmarks. **Tus datos en tu máquina, sin servidor, sin cuenta, sin cobros.**
 
@@ -69,8 +69,8 @@ Para crear una **carpeta**: selecciona la colección en el sidebar, luego entra 
 1. Abre `chrome://extensions` en tu navegador
 2. Activa **Modo de desarrollador** (toggle arriba a la derecha)
 3. Click en **Cargar descomprimida**
-4. Selecciona la carpeta `TabVault`
-5. Listo. Abre una pestaña nueva y aparece TabVault.
+4. Selecciona la carpeta `Tablealo`
+5. Listo. Abre una pestaña nueva y aparece Tablealo.
 
 Para fijar el ícono en la barra: click derecho en la barra de pestañas → **Fijar**.
 
@@ -79,7 +79,7 @@ Para fijar el ícono en la barra: click derecho en la barra de pestañas → **F
 ## Importar tus bookmarks de Toby
 
 1. En Toby: **Account Settings → Export → JSON**
-2. En TabVault: click en **Importar** y selecciona ese `.json`
+2. En Tablealo: click en **Importar** y selecciona ese `.json`
 3. Verás el toast `Importados 182 colecciones · 1270 bookmarks`
 
 Los grupos de Toby se convierten en **espacios** (sección izquierda del sidebar).
@@ -115,17 +115,17 @@ Atajo: `Ctrl+K` para saltar al buscador. `Esc` limpia.
 
 1. Crea un repo **privado** en GitHub
 2. Genera un Personal Access Token: GitHub → Settings → Developer settings → Personal access tokens → **scope `repo`**
-3. En TabVault: ⚙ → pega usuario, repo, token, rama
+3. En Tablealo: ⚙ → pega usuario, repo, token, rama
 4. **Subir a GitHub** = sube tu estado. **Bajar de GitHub** = lo restaura.
 
-El archivo en GitHub es un solo `tabvault.json` en tu repo. Nadie más lo ve.
+El archivo en GitHub es un solo `tablealo.json` en tu repo. Nadie más lo ve.
 
 ---
 
 ## Estructura del proyecto
 
 ```
-TabVault/
+Tablealo/
 ├── manifest.json     Permisos y configuración de la extensión
 ├── newtab.html       Estructura de la interfaz
 ├── styles.css        Estilos + temas claro/oscuro
