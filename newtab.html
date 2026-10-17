@@ -16,7 +16,7 @@
   </div>
 
   <div class="toolbar-center">
-    <input type="search" id="search" placeholder="Buscar...  #colecciones  %todo  ?google  !chatgpt  @tag" autocomplete="off">
+    <input type="search" id="search" placeholder="Buscar...  #escritorios  %todo  ?google  !chatgpt  @tag" autocomplete="off">
   </div>
 
   <div class="toolbar-right">
@@ -31,7 +31,7 @@
 <!-- ============ LAYOUT PRINCIPAL ============ -->
 <div class="layout">
 
-  <!-- SIDEBAR: espacios > colecciones -->
+  <!-- SIDEBAR: oficinas > departamentos > escritorios -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-actions">
       <button class="btn btn-primary" id="btnImport">Importar</button>
@@ -41,18 +41,25 @@
 
     <!-- Menú desplegable de "+ Nueva" -->
     <div class="new-menu" id="newMenu">
-      <button class="new-menu-item" id="menuNewCollection">
-        <span class="new-menu-icon">🗂</span>
+      <button class="new-menu-item" id="menuNewOffice">
+        <span class="new-menu-icon">🏢</span>
         <span class="new-menu-text">
-          <span class="new-menu-title">Nuevo Grupo</span>
-          <span class="new-menu-desc">Un espacio nuevo para agrupar colecciones</span>
+          <span class="new-menu-title">Nueva Oficina</span>
+          <span class="new-menu-desc">Agrupa varios Departamentos</span>
         </span>
       </button>
-      <button class="new-menu-item" id="menuNewFolder">
-        <span class="new-menu-icon">📁</span>
+      <button class="new-menu-item" id="menuNewCollection">
+        <span class="new-menu-icon">🔴</span>
         <span class="new-menu-text">
-          <span class="new-menu-title">Nueva Carpeta</span>
-          <span class="new-menu-desc">Dentro de la colección seleccionada</span>
+          <span class="new-menu-title">Nuevo Departamento</span>
+          <span class="new-menu-desc">Con su círculo de color</span>
+        </span>
+      </button>
+      <button class="new-menu-item" id="menuNewDesktop">
+        <span class="new-menu-icon">🖥️</span>
+        <span class="new-menu-text">
+          <span class="new-menu-title">Nuevo Escritorio</span>
+          <span class="new-menu-desc">Pones el nombre que quieras</span>
         </span>
       </button>
     </div>
@@ -65,12 +72,12 @@
     <div class="empty" id="emptyState">
       <div class="empty-icon">📦</div>
       <h1>Tablealo</h1>
-      <p>Tus bookmarks viven solo en este navegador. Sin cuentas, sin servidores, sin cobros.</p>
+      <p>Tus enlaces viven solo en este navegador. Sin cuentas, sin servidores, sin cobros.</p>
       <button class="btn btn-primary btn-lg" id="btnImportEmpty">Importar JSON de Toby</button>
       <p class="empty-hint">Puedes importar el archivo <code>toby-export-*.json</code> directamente.</p>
     </div>
 
-    <!-- Vista tablero: grid de colecciones -->
+    <!-- Vista tablero: grid de escritorios -->
     <div class="board" id="board"></div>
 
     <!-- Vista canvas: mapa visual -->
@@ -81,7 +88,7 @@
         <button class="icon-btn" id="zoomOut">−</button>
         <button class="icon-btn" id="zoomFit">⤢</button>
       </div>
-      <div class="canvas-hint">Click en un espacio para ver sus colecciones · arrastra el fondo para moverte · rueda para zoom</div>
+      <div class="canvas-hint">Click en una Oficina y luego en un Departamento para ver sus Escritorios · arrastra el fondo para moverte · rueda para zoom</div>
     </div>
   </main>
 
@@ -123,7 +130,7 @@
           <input type="text" id="ghUser" placeholder="tu-usuario">
         </label>
         <label>Nombre del repositorio
-          <input type="text" id="ghRepo" placeholder="mis-bookmarks">
+          <input type="text" id="ghRepo" placeholder="mi-tablealo">
         </label>
         <label>Personal Access Token
           <input type="password" id="ghToken" placeholder="ghp_...">

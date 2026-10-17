@@ -11,16 +11,22 @@
 const STORAGE_KEY = 'tablealo_v1';
 
 /* Modelo de datos:
-   spaces      = [{ id, name, color }]
-   collections = [{ id, spaceId, name, bookmarks: [ids] }]
-   bookmarks   = { id, title, url, icon, note, tags: [] }
+
+   offices     = [{ id, name, color, shared }]        OFICINAS
+   spaces      = [{ id, officeId, name, color }]      DEPARTAMENTOS
+   collections = [{ id, spaceId, name, bookmarks }]   ESCRITORIOS
+   bookmarks   = { id: { title, url, icon, note } }
+
+   Jerarquia: Oficina > Departamento > Escritorio > Bookmark
+   El usuario le pone a cada Escritorio el nombre que quiera.
 */
 let state = {
+  offices: [],
   spaces: [],
   collections: [],
   bookmarks: {},
   settings: { theme: 'light', view: 'board', bgImage: null, gh: { user:'', repo:'', token:'', branch:'main' } },
-  ui: { search: '', selectedCollection: null }
+  ui: { search: '', selectedCollection: null, selectedOffice: null, selectedSpace: null }
 };
 
 let uid = 0;
@@ -69,7 +75,7 @@ async function load() {
 /* ================================================================
    IMPORTAR JSON DE TOBY (soporta v4 y formatos anteriores)
    El archivo v4 tiene: { version, groups: [{ name, type, lists }] }
-   Los grupos de Toby se convierten en ESPACIOS.
+   Los grupos de Toby se convierten en DEPARTAMENTOS de una sola Oficina.
    ================================================================ */
 function importToby(json) {
   // Si viene como string, parsear
@@ -83,18 +89,29 @@ function importToby(json) {
     return false;
   }
 
+  state.offices = [];
   state.spaces = [];
   state.collections = [];
   state.bookmarks = {};
 
-  const spaceColors = ['#f65077','#4a90e2','#1a9e4b','#f0a020','#9b59b6','#e0563a','#00a5a5','#d94f8a'];
+  const deptColors = ['#f65077','#4a90e2','#1a9e4b','#f0a020','#9b59b6','#e0563a','#00a5a5','#d94f8a'];
+
+  // Todo lo importado de Toby cabe en una sola Oficina.
+  const officeId = genId('of');
+  state.offices.push({
+    id: officeId,
+    name: 'Importado de Toby',
+    color: '#4a90e2',
+    shared: false
+  });
 
   for (const group of json.groups) {
     const spaceId = genId('sp');
     state.spaces.push({
       id: spaceId,
+      officeId,
       name: group.name || 'Sin nombre',
-      color: spaceColors[state.spaces.length % spaceColors.length]
+      color: deptColors[state.spaces.length % deptColors.length]
     });
 
     for (const list of (group.lists || [])) {
@@ -125,7 +142,6 @@ function importToby(json) {
         name: list.title || 'Sin titulo',
         color: nextColor(state.collections.length),
         bookmarks: bookmarkIds,
-        folders: [],
         position: state.collections.length
       });
     }
@@ -135,7 +151,7 @@ function importToby(json) {
   return true;
 }
 
-/* Ordena las colecciones por nombre dentro de cada espacio */
+/* Ordena los Escritorios por nombre dentro de cada Departamento */
 function sortCollections() {
   state.collections.sort((a, b) => a.name.localeCompare(b.name, 'es'));
 }
@@ -241,13 +257,13 @@ function setSyncStatus(msg, cls = '') {
 
 /* ================================================================
    BUSQUEDA CON OPERADORES
-   #texto    -> solo colecciones
-   %texto    -> global (todas las colecciones)
+   #texto    -> solo escritorios
+   %texto    -> global (todos los escritorios)
    ?texto    -> buscar en Google
    !texto    -> preguntar a ChatGPT
-   @tag      -> bookmarks con ese tag
+   @tag      -> enlaces con ese tag
    a|b       -> OR
-   texto     -> bookmarks dentro de la coleccion seleccionada
+   texto     -> enlaces dentro del escritorio seleccionado
    ================================================================ */
 function parseQuery(raw) {
   const q = raw.trim();
@@ -283,7 +299,7 @@ function searchResults(query) {
 
   const out = [];
 
-  // Busqueda dentro de los bookmarks
+  // Busqueda dentro de los enlaces
   if (q.type === 'bookmarks' || q.type === 'global' || q.type === 'or') {
     const scope = (q.type === 'bookmarks' && state.ui.selectedCollection)
       ? state.collections.filter(c => c.id === state.ui.selectedCollection)
@@ -304,7 +320,7 @@ function searchResults(query) {
     return out;
   }
 
-  // Los demas operadores matchean por nombre de coleccion o por tag
+  // Los demas operadores matchean por nombre de escritorio o por tag
   for (const col of state.collections) {
     const space = state.spaces.find(s => s.id === col.spaceId);
 
@@ -350,160 +366,190 @@ function renderSidebar() {
       return;
     }
     list.innerHTML = results.map(r => {
-      const count = r.bookmarks ? r.bookmarks.length : r.collection.bookmarks.length;
+      const count = r.bookmarks ? r.bookmarks.length : colTotal(r.collection);
       return `<div class="collection-item" data-col="${r.collection.id}">
-        <span class="col-icon">📁</span>
+        <span class="col-icon">🖥️</span>
         <span class="col-name">${esc(r.collection.name)}</span>
         <span class="col-count">${count}</span>
       </div>`;
     }).join('');
-    document.getElementById('stats').textContent = results.length + ' colecciones';
+    document.getElementById('stats').textContent =
+      results.length + (results.length === 1 ? ' escritorio' : ' escritorios');
     bindSidebar();
     return;
   }
 
-  // Vista normal: espacios > colecciones > carpetas
+  // Vista normal: oficinas > departamentos > escritorios
   const totalBm = Object.keys(state.bookmarks).length;
-  document.getElementById('stats').textContent = `${state.collections.length} colecciones · ${totalBm} bookmarks`;
+  document.getElementById('stats').textContent =
+    `${state.offices.length} oficinas · ${state.spaces.length} departamentos · ${state.collections.length} escritorios · ${totalBm} enlaces`;
 
-  list.innerHTML = state.spaces.map(space => {
-    const cols = state.collections.filter(c => c.spaceId === space.id);
-    const colCount = cols.reduce((n, c) => n + colTotal(c), 0);
+  if (state.offices.length === 0) {
+    list.innerHTML = `
+      <div class="cc-empty">
+        Todavia no hay oficinas.<br>
+        Crea una para empezar a organizar tus marcadores.
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = state.offices.map(office => {
+    const depts = state.spaces.filter(s => s.officeId === office.id);
     return `
-      <div class="space open" data-space="${space.id}">
-        <div class="space-header">
-          <span class="space-chevron">▶</span>
-          <span class="space-dot" style="background:${space.color}"></span>
-          <span class="space-name">${esc(space.name)}</span>
-          <span class="space-count">${cols.length} · ${colCount}</span>
-          <button class="space-add" data-act="add-collection" data-space="${space.id}" title="Añadir colección a este grupo">+</button>
+      <div class="office ${office.id === state.ui.selectedOffice ? 'open' : ''}" data-office="${office.id}">
+        <div class="office-header">
+          <span class="office-chevron">▶</span>
+          <span class="office-name">${esc(office.name)}</span>
+          <span class="office-tag">${office.shared ? 'compartida' : 'privada'}</span>
+          <span class="office-count">${depts.length}</span>
+          <button class="office-add-dept" data-act="add-department" data-office="${office.id}" title="Nuevo departamento">+</button>
         </div>
-        <div class="space-collections">
-          ${cols.map(col => `
-            <div class="col-group">
-              <div class="collection-item ${col.id === state.ui.selectedCollection && !state.ui.selectedFolder ? 'active' : ''}" data-col="${col.id}">
-                ${col.folders.length
-                  ? `<span class="chevron ${state.ui.selectedCollection === col.id ? 'down' : ''}">▶</span>`
-                  : '<span class="chevron spacer"></span>'}
-                <span class="col-icon">📁</span>
-                <span class="col-name">${esc(col.name)}</span>
-                <span class="col-count">${colTotal(col)}</span>
-              </div>
-              ${col.folders.length ? `
-                <div class="folder-group ${state.ui.selectedCollection === col.id ? 'open' : ''}" data-col="${col.id}">
-                  <div class="folder-group-items">
-                    ${col.folders.map(f => `
-                      <div class="folder-item ${state.ui.selectedFolder === f.id ? 'active' : ''}"
-                           data-col="${col.id}" data-folder="${f.id}">
-                        <span class="col-icon">🗂</span>
-                        <span class="col-name">${esc(f.name)}</span>
-                        <span class="col-count">${f.bookmarks.length}</span>
+        <div class="office-body">
+          ${depts.length === 0
+            ? '<div class="dept-empty">Sin departamentos</div>'
+            : depts.map(space => {
+                const cols = state.collections.filter(c => c.spaceId === space.id);
+                const total = cols.reduce((n, c) => n + colTotal(c), 0);
+                // El Departamento se ve desplegado si es el seleccionado
+                const abierto = space.id === state.ui.selectedSpace;
+                return `
+                <div class="space ${abierto ? 'open' : ''}" data-space="${space.id}">
+                  <div class="space-header">
+                    <span class="space-chevron">▶</span>
+                    <span class="space-dot" style="background:${space.color}"></span>
+                    <span class="space-name">${esc(space.name)}</span>
+                    <span class="space-count">${total}</span>
+                    <button class="space-add" data-act="add-collection" data-space="${space.id}" title="Nuevo escritorio">+</button>
+                  </div>
+                  <div class="space-collections">
+                    ${cols.map(col => `
+                      <div class="collection-item ${col.id === state.ui.selectedCollection ? 'active' : ''}" data-col="${col.id}">
+                        <span class="col-icon">🖥️</span>
+                        <span class="col-name">${esc(col.name)}</span>
+                        <span class="col-count">${colTotal(col)}</span>
                       </div>
                     `).join('')}
                   </div>
-                </div>
-              ` : ''}
-            </div>
-          `).join('')}
+                </div>`;
+              }).join('')}
         </div>
       </div>`;
   }).join('');
+
+  list.insertAdjacentHTML('beforeend', `
+    <button class="new-office" data-act="new-office">
+      <span>+</span> Nueva Oficina
+    </button>`);
+
   bindSidebar();
 }
 
-/* Total de bookmarks de una coleccion: los directos + los de sus carpetas */
+/* Total de enlaces de un Escritorio.
+   Cada enlace vive directo en su Escritorio, sin carpetas intermedias. */
 function colTotal(col) {
-  const direct = (col.bookmarks || []).length;
-  const inFolders = (col.folders || []).reduce((n, f) => n + f.bookmarks.length, 0);
-  return direct + inFolders;
+  return (col.bookmarks || []).length;
 }
 
 function bindSidebar() {
-  document.querySelectorAll('.space-header').forEach(h => {
+  // Encabezado de Oficina: despliega / repliega
+  document.querySelectorAll('.office-header').forEach(h => {
     h.addEventListener('click', e => {
-      // El boton + del grupo no debe desplegarlo
-      if (e.target.closest('.space-add')) return;
-      h.parentElement.classList.toggle('open');
+      if (e.target.closest('.office-add-dept')) return;
+      const of = h.parentElement;
+      const id = of.dataset.office;
+      const abriendo = !of.classList.contains('open');
+      of.classList.toggle('open', abriendo);
+      state.ui.selectedOffice = abriendo ? id : null;
+      if (abriendo) {
+        // Al abrir una Oficina se despliega su primer Departamento
+        const primerDept = of.querySelector('.space');
+        if (primerDept && !of.querySelector('.space.open')) {
+          primerDept.classList.add('open');
+          state.ui.selectedSpace = primerDept.dataset.space;
+        }
+      }
+      save();
     });
   });
 
-  // Boton + de cada grupo: crear coleccion dentro de ese grupo
+  // Boton + de cada Oficina: crear Departamento
+  document.querySelectorAll('#sidebarList .office-add-dept').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const officeId = btn.dataset.office;
+      const office = state.offices.find(o => o.id === officeId);
+      const name = prompt(`Nombre del nuevo departamento en "${office ? office.name : ''}":`);
+      if (!name) return;
+      const spaceId = genId('sp');
+      state.spaces.push({
+        id: spaceId,
+        officeId,
+        name: name.trim(),
+        color: nextColor(state.spaces.length)
+      });
+      btn.closest('.office')?.classList.add('open');
+      state.ui.selectedOffice = officeId;
+      save(); render();
+      toast('Departamento creado');
+    });
+  });
+
+  // Encabezado de Departamento: despliega / replega sus Escritorios
+  document.querySelectorAll('#sidebarList .space-header').forEach(h => {
+    h.addEventListener('click', e => {
+      if (e.target.closest('.space-add')) return;
+      const sp = h.parentElement;
+      const id = sp.dataset.space;
+      const abriendo = !sp.classList.contains('open');
+      sp.classList.toggle('open', abriendo);
+      state.ui.selectedSpace = abriendo ? id : null;
+      const office = sp.closest('.office');
+      if (office && abriendo) {
+        office.classList.add('open');
+        state.ui.selectedOffice = office.dataset.office;
+      }
+      save();
+    });
+  });
+
+  // Boton + de cada Departamento: crear Escritorio
   document.querySelectorAll('#sidebarList .space-add').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation();
       const spaceId = btn.dataset.space;
       const space = state.spaces.find(s => s.id === spaceId);
-      const name = prompt(`Nombre de la nueva coleccion en "${space ? space.name : ''}":`);
-      if (!name) return;
-      const colId = genId('col');
-      state.collections.push({
-        id: colId,
-        spaceId,
-        name: name.trim(),
-        color: nextColor(state.collections.length),
-        bookmarks: [],
-        folders: [],
-        position: state.collections.length
-      });
-      state.ui.selectedCollection = colId;
-      state.ui.selectedFolder = null;
-      // Asegurar que el grupo este expandido
-      const group = btn.closest('.space');
-      group?.classList.add('open');
+      const name = prompt(`Nombre del nuevo escritorio en "${space ? space.name : ''}":`);
+      if (!name || !name.trim()) return;
+      createDesktop(spaceId, name.trim());
+      // Abrir la oficina y el departamento para que se vea recien creado
+      const office = btn.closest('.office');
+      office?.classList.add('open');
+      state.ui.selectedOffice = office?.dataset.office || null;
+      state.ui.selectedSpace = spaceId;
       save(); render();
-      toast('Coleccion creada');
+      toast('Escritorio creado');
     });
   });
 
-  // Carpetas: seleccionar coleccion + carpeta
-  document.querySelectorAll('#sidebarList [data-folder]').forEach(f => {
-    f.addEventListener('click', () => {
-      state.ui.selectedCollection = f.dataset.col;
-      state.ui.selectedFolder = f.dataset.folder;
-      render();
-    });
-    f.addEventListener('dragover', e => { e.preventDefault(); f.classList.add('drop-target'); });
-    f.addEventListener('dragleave', () => f.classList.remove('drop-target'));
-    f.addEventListener('drop', e => {
-      e.preventDefault();
-      f.classList.remove('drop-target');
-      const url = e.dataTransfer.getData('text/url');
-      const bmId = e.dataTransfer.getData('text/bookmark-id');
-      if (url) addBookmarkToFolder(f.dataset.col, f.dataset.folder, url);
-      else if (bmId) moveBookmarkToFolder(bmId, f.dataset.col, f.dataset.folder);
-    });
-  });
-
-  // Colecciones (sin atributo folder)
+  // Escritorios: seleccionar
   document.querySelectorAll('#sidebarList .collection-item[data-col]').forEach(c => {
     c.addEventListener('click', () => {
-      const colId = c.dataset.col;
-      const col = state.collections.find(x => x.id === colId);
-
-      // Si la coleccion tiene carpetas, el click despliega/selecciona
-      if (col && col.folders.length) {
-        const group = c.closest('.col-group')?.querySelector('.folder-group');
-        if (group) {
-          const abria = group.classList.contains('open');
-          group.classList.toggle('open');
-          c.querySelector('.chevron')?.classList.toggle('down', !abria);
-          if (abria) {
-            state.ui.selectedCollection = null;
-            state.ui.selectedFolder = null;
-          } else {
-            state.ui.selectedCollection = colId;
-            state.ui.selectedFolder = null;
-          }
-          render();
-          return;
-        }
+      state.ui.selectedCollection = c.dataset.col;
+      // Abrir la oficina y el departamento del escritorio elegido
+      const office = c.closest('.office');
+      if (office) { office.classList.add('open'); state.ui.selectedOffice = office.dataset.office; }
+      const space = c.closest('.space');
+      if (space) {
+        space.classList.add('open');
+        state.ui.selectedSpace = space.dataset.space;
       }
-
-      state.ui.selectedCollection = colId;
-      state.ui.selectedFolder = null;
+      // Cerrar los demas Departamentos para no saturar el panel
+      c.closest('.office')?.querySelectorAll('.space.open').forEach(s => {
+        if (s !== space) s.classList.remove('open');
+      });
       render();
     });
-    // drop de pestanas abiertas
+    // Arrastrar pestanas abiertas sobre el escritorio
     c.addEventListener('dragover', e => { e.preventDefault(); c.classList.add('drop-target'); });
     c.addEventListener('dragleave', () => c.classList.remove('drop-target'));
     c.addEventListener('drop', e => {
@@ -515,6 +561,10 @@ function bindSidebar() {
       else if (bmId) moveBookmark(bmId, c.dataset.col);
     });
   });
+
+  // Boton final: crear una Oficina nueva
+  const newOfficeBtn = document.querySelector('#sidebarList .new-office');
+  if (newOfficeBtn) newOfficeBtn.addEventListener('click', () => createOffice());
 }
 
 /* ---- TABLERO ---- */
@@ -527,7 +577,7 @@ function renderBoard() {
     collectionsToShow = state.collections.filter(c => c.id === state.ui.selectedCollection);
   }
   if (q) {
-    // En busqueda, mostrar solo colecciones con coincidencias
+    // En busqueda, mostrar solo escritorios con coincidencias
     collectionsToShow = searchResults(q).map(r => r.collection);
   }
 
@@ -538,12 +588,7 @@ function renderBoard() {
 
   board.innerHTML = collectionsToShow.map(col => {
     const space = state.spaces.find(s => s.id === col.spaceId);
-    const folders = col.folders || [];
-    const directBms = col.bookmarks.map(id => state.bookmarks[id]).filter(Boolean);
-    const total = colTotal(col);
-    const onlyFolder = state.ui.selectedFolder
-      ? folders.find(f => f.id === state.ui.selectedFolder)
-      : null;
+    const bms = (col.bookmarks || []).map(id => state.bookmarks[id]).filter(Boolean);
 
     const rowHtml = (bm) => `
       <div class="bm-row" data-bm="${bm.id}" data-url="${esc(bm.url)}" draggable="true">
@@ -558,56 +603,28 @@ function renderBoard() {
         </div>
       </div>`;
 
-    const folderBlock = (folder) => `
-      <div class="cc-folder" data-folder="${folder.id}" data-col="${col.id}">
-        <div class="cc-folder-header">
-          <span class="col-icon">🗂</span>
-          <span class="cc-folder-name">${esc(folder.name)}</span>
-          <span class="cc-folder-count">${folder.bookmarks.length}</span>
-          <button class="icon-btn bm-del" data-act="delete-folder" data-col="${col.id}" data-folder="${folder.id}" title="Eliminar carpeta">✕</button>
-        </div>
-        ${folder.bookmarks.length === 0
-          ? '<div class="cc-empty small">Vacía</div>'
-          : folder.bookmarks.map(id => state.bookmarks[id]).filter(Boolean).map(bm => rowHtml(bm)).join('')}
-      </div>`;
-
-    const contentHtml = onlyFolder
-      ? (onlyFolder.bookmarks.length === 0
-          ? '<div class="cc-empty">Esta carpeta está vacía</div>'
-          : onlyFolder.bookmarks.map(id => state.bookmarks[id]).filter(Boolean).map(bm => rowHtml(bm)).join(''))
-      : (folders.length ? folders.map(folderBlock).join('') : '') +
-        (directBms.length
-          ? (folders.length ? '<div class="cc-subsection">Sin carpeta</div>' : '') +
-            directBms.map(bm => rowHtml(bm)).join('')
-          : (folders.length ? '' : '<div class="cc-empty">Sin bookmarks</div>'));
-
-    // Cuando estas dentro de una carpeta, el boton de papelera borra la CARPETA
-    const deleteBtn = onlyFolder
-      ? `<button class="icon-btn" data-act="delete-folder" data-col="${col.id}" data-folder="${onlyFolder.id}" title="Eliminar carpeta">🗑</button>`
-      : `<button class="icon-btn" data-act="delete-col" data-col="${col.id}" title="Eliminar colección">🗑</button>`;
+    const contentHtml = bms.length
+      ? bms.map(bm => rowHtml(bm)).join('')
+      : '<div class="cc-empty">Sin enlaces</div>';
 
     return `
       <div class="collection-card" data-col="${col.id}">
         <div class="cc-header">
           <span class="cc-space-dot" style="background:${space ? space.color : '#888'}"></span>
           <div style="flex:1;min-width:0">
-            <div class="cc-title">${esc(onlyFolder ? onlyFolder.name : col.name)}</div>
-            <div class="cc-space">${esc(onlyFolder ? col.name : (space ? space.name : ''))}</div>
+            <div class="cc-title">${esc(col.name)}</div>
+            <div class="cc-space">${esc(space ? space.name : '')}</div>
           </div>
           <div class="cc-actions">
-            ${onlyFolder
-              ? `<button class="icon-btn" data-act="back-to-collection" data-col="${col.id}" title="Volver a la colección">←</button>`
-              : ''}
             <button class="icon-btn" data-act="open-group" data-col="${col.id}" title="Abrir como grupo de pestañas">⊞</button>
-            ${deleteBtn}
+            <button class="icon-btn" data-act="delete-col" data-col="${col.id}" title="Eliminar escritorio">🗑</button>
           </div>
         </div>
         <div class="cc-list">
           ${contentHtml}
         </div>
         <div class="cc-footer">
-          <span class="cc-meta">${onlyFolder ? onlyFolder.bookmarks.length : total} bookmarks</span>
-          ${onlyFolder ? `<button class="btn btn-sm" data-act="back-to-collection" data-col="${col.id}">Volver</button>` : ''}
+          <span class="cc-meta">${bms.length} ${bms.length === 1 ? 'enlace' : 'enlaces'}</span>
           <button class="btn btn-sm" data-act="open-all" data-col="${col.id}">Abrir todo</button>
         </div>
       </div>`;
@@ -623,7 +640,7 @@ function bindBoard() {
       if (e.target.closest('[data-act]')) return;
       window.open(r.dataset.url, '_blank');
     });
-    // Arrastrar bookmark a otra coleccion o carpeta
+    // Arrastrar bookmark a otro escritorio
     r.addEventListener('dragstart', e => {
       r.classList.add('dragging');
       e.dataTransfer.setData('text/bookmark-id', r.dataset.bm);
@@ -631,37 +648,14 @@ function bindBoard() {
     r.addEventListener('dragend', () => r.classList.remove('dragging'));
   });
 
-  // Carpetas dentro de las cards: click entra a la carpeta, drop recibe bookmarks
-  document.querySelectorAll('#board .cc-folder').forEach(f => {
-    f.addEventListener('click', e => {
-      if (e.target.closest('[data-act]')) return;
-      state.ui.selectedCollection = f.dataset.col;
-      state.ui.selectedFolder = f.dataset.folder;
-      render();
-    });
-    f.addEventListener('dragover', e => { e.preventDefault(); f.classList.add('drop-target'); });
-    f.addEventListener('dragleave', () => f.classList.remove('drop-target'));
-    f.addEventListener('drop', e => {
-      e.preventDefault();
-      f.classList.remove('drop-target');
-      const bmId = e.dataTransfer.getData('text/bookmark-id');
-      const url = e.dataTransfer.getData('text/url');
-      if (bmId) moveBookmarkToFolder(bmId, f.dataset.col, f.dataset.folder);
-      else if (url) addBookmarkToFolder(f.dataset.col, f.dataset.folder, url);
-    });
-  });
-
   // Cards aceptan drop
   document.querySelectorAll('#board .collection-card').forEach(card => {
     card.addEventListener('dragover', e => {
-      // Si el puntero esta sobre una carpeta, que la carpeta reciba el drop
-      if (e.target.closest('.cc-folder')) return;
       e.preventDefault();
       card.classList.add('drop-target');
     });
     card.addEventListener('dragleave', () => card.classList.remove('drop-target'));
     card.addEventListener('drop', e => {
-      if (e.target.closest('.cc-folder')) return;
       e.preventDefault();
       card.classList.remove('drop-target');
       const bmId = e.dataTransfer.getData('text/bookmark-id');
@@ -678,30 +672,25 @@ function bindBoard() {
       const act = b.dataset.act;
       const colId = b.dataset.col;
       const bmId = b.dataset.bm;
-      const folderId = b.dataset.folder;
 
       if (act === 'delete-bm') deleteBookmark(bmId);
       if (act === 'edit-bm') startEditTitle(bmId);
       if (act === 'delete-col') deleteCollection(colId);
-      if (act === 'delete-folder') deleteFolder(colId, folderId);
       if (act === 'open-group') openCollectionAsGroup(colId);
       if (act === 'open-all') openCollectionAsGroup(colId);
-      if (act === 'add-folder') promptNewFolder(colId);
-      if (act === 'back-to-collection') {
-        state.ui.selectedFolder = null;
-        render();
-      }
     });
   });
 }
 
 /* ---- CANVAS (mapa visual con drill-down) ----
-   Con 182 colecciones un mapa radial de una sola vez resulta ilegible:
-   todos los nombres se enciman. Por eso tiene dos niveles:
-     nivel 1 = los espacios (visibles de un vistazo)
-     nivel 2 = las colecciones de UN espacio (click en el espacio)
-   Click en una coleccion la selecciona y vuelve al tablero. */
-let canvasLevel = 'spaces';
+   Con 182 Escritorios un mapa radial de una sola vez resulta ilegible:
+   todos los nombres se enciman. Por eso baja por niveles:
+     nivel 1 = las Oficinas
+     nivel 2 = los Departamentos de UNA Oficina
+     nivel 3 = los Escritorios de UN Departamento
+   Click en un Escritorio lo selecciona y vuelve al tablero. */
+let canvasLevel = 'offices';
+let canvasOffice = null;
 let canvasSpace = null;
 
 function renderCanvas() {
@@ -713,34 +702,76 @@ function renderCanvas() {
 
   let html = '';
 
-  if (canvasLevel === 'space') {
-    html += `<text x="${cx}" y="34" text-anchor="middle" fill="var(--fg-muted)" font-size="12" style="cursor:pointer" id="canvasBack">volver a todos los espacios</text>`;
+  // Boton de volver, segun el nivel actual
+  if (canvasLevel === 'departments') {
+    html += `<text x="${cx}" y="34" text-anchor="middle" fill="var(--fg-muted)" font-size="12" style="cursor:pointer" id="canvasBack">volver a todas las oficinas</text>`;
+  } else if (canvasLevel === 'desktops') {
+    html += `<text x="${cx}" y="34" text-anchor="middle" fill="var(--fg-muted)" font-size="12" style="cursor:pointer" id="canvasBack">volver a los departamentos</text>`;
   }
 
-  if (canvasLevel === 'spaces') {
-    const n = state.spaces.length || 1;
-    state.spaces.forEach((space, i) => {
+  if (canvasLevel === 'offices') {
+    // NIVEL 1: Oficinas
+    const n = state.offices.length || 1;
+    state.offices.forEach((office, i) => {
       const angle = (i / n) * Math.PI * 2 - Math.PI / 2;
       const x = cx + Math.cos(angle) * radius;
       const y = cy + Math.sin(angle) * radius;
-      const cols = state.collections.filter(c => c.spaceId === space.id);
-      const bms = cols.reduce((acc, c) => acc + c.bookmarks.length, 0);
-      const r = Math.min(46, 21 + cols.length * 0.85);
+      const depts = state.spaces.filter(s => s.officeId === office.id);
+      const desks = state.collections.filter(c => depts.some(d => d.id === c.spaceId));
+      const links = desks.reduce((acc, c) => acc + colTotal(c), 0);
+      const r = Math.min(56, 24 + depts.length * 0.9);
 
       html += `<line class="edge" x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" opacity="0.5"/>`;
-      html += `<g class="node" data-space="${space.id}" style="cursor:pointer">
-        <circle cx="${x}" cy="${y}" r="${r}" fill="${space.color}" opacity="0.92"/>
-        <text x="${x}" y="${y - 1}" text-anchor="middle" fill="#fff" font-size="10" font-weight="700">${esc(space.name.slice(0, 16))}</text>
-        <text x="${x}" y="${y + 11}" text-anchor="middle" fill="#fff" font-size="8" opacity="0.85">${cols.length} col · ${bms} links</text>
+      // El nombre va debajo del circulo: dentro se cortaria muy pronto
+      html += `<g class="node" data-office="${office.id}" style="cursor:pointer">
+        <circle cx="${x}" cy="${y}" r="${r}" fill="${office.color || '#4a90e2'}" opacity="0.92"/>
+        <text x="${x}" y="${y - 1}" text-anchor="middle" fill="#fff" font-size="10" font-weight="700">${esc(office.name.slice(0, 10))}</text>
+        <text x="${x}" y="${y + 11}" text-anchor="middle" fill="#fff" font-size="8" opacity="0.85">${depts.length} dep · ${desks.length} esc</text>
+        <text x="${x}" y="${y + r + 14}" text-anchor="middle" fill="var(--fg)" font-size="10" font-weight="600">${esc(office.name)}</text>
+        <text x="${x}" y="${y + r + 26}" text-anchor="middle" fill="var(--fg-muted)" font-size="8">${links} enlaces</text>
       </g>`;
     });
 
     html += `<g>
       <circle cx="${cx}" cy="${cy}" r="34" fill="var(--accent)" opacity="0.15"/>
       <circle cx="${cx}" cy="${cy}" r="24" fill="var(--accent)"/>
-      <text x="${cx}" y="${cy + 4}" text-anchor="middle" fill="#fff" font-size="10" font-weight="600">${state.collections.length} col</text>
+      <text x="${cx}" y="${cy + 4}" text-anchor="middle" fill="#fff" font-size="10" font-weight="600">${state.collections.length} esc</text>
+    </g>`;
+  } else if (canvasLevel === 'departments') {
+    // NIVEL 2: Departamentos de la Oficina abierta
+    const office = state.offices.find(o => o.id === canvasOffice);
+    const depts = state.spaces.filter(s => s.officeId === canvasOffice);
+    const n = depts.length || 1;
+    const twoRings = n > 18;
+    const firstRing = twoRings ? Math.ceil(n / 2) : n;
+
+    html += `<text x="${cx}" y="${cy - radius * 0.95}" text-anchor="middle" fill="var(--fg)" font-size="16" font-weight="600">${esc(office ? office.name : '')}</text>`;
+
+    depts.forEach((space, i) => {
+      const onSecond = twoRings && i >= firstRing;
+      const idx = onSecond ? i - firstRing : i;
+      const ringN = onSecond ? n - firstRing : firstRing;
+      const rr = onSecond ? radius : radius * 0.7;
+      const angle = (idx / Math.max(ringN, 1)) * Math.PI * 2 - Math.PI / 2;
+      const x = cx + Math.cos(angle) * rr;
+      const y = cy + Math.sin(angle) * rr;
+      const desks = state.collections.filter(c => c.spaceId === space.id);
+      const links = desks.reduce((acc, c) => acc + colTotal(c), 0);
+
+      html += `<line class="edge" x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" opacity="0.3"/>`;
+      html += `<g class="node" data-space="${space.id}" style="cursor:pointer">
+        <circle cx="${x}" cy="${y}" r="7" fill="${space.color}"/>
+        <text x="${x}" y="${y - 13}" text-anchor="middle" fill="var(--fg)" font-size="9" opacity="0.92">${esc(space.name.slice(0, 20))}</text>
+        <text x="${x}" y="${y + 19}" text-anchor="middle" fill="var(--fg-muted)" font-size="7.5">${desks.length} esc · ${links}</text>
+      </g>`;
+    });
+
+    html += `<g>
+      <circle cx="${cx}" cy="${cy}" r="28" fill="var(--accent)" opacity="0.15"/>
+      <circle cx="${cx}" cy="${cy}" r="20" fill="var(--accent)"/>
     </g>`;
   } else {
+    // NIVEL 3: Escritorios del Departamento abierto
     const space = state.spaces.find(s => s.id === canvasSpace);
     const cols = state.collections.filter(c => c.spaceId === canvasSpace);
     const n = cols.length || 1;
@@ -753,16 +784,16 @@ function renderCanvas() {
       const onSecond = twoRings && j >= firstRing;
       const idx = onSecond ? j - firstRing : j;
       const ringN = onSecond ? n - firstRing : firstRing;
-      const r = onSecond ? radius : radius * 0.66;
+      const rr = onSecond ? radius : radius * 0.66;
       const angle = (idx / Math.max(ringN, 1)) * Math.PI * 2 - Math.PI / 2;
-      const x = cx + Math.cos(angle) * r;
-      const y = cy + Math.sin(angle) * r;
+      const x = cx + Math.cos(angle) * rr;
+      const y = cy + Math.sin(angle) * rr;
 
       html += `<line class="edge" x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" opacity="0.3"/>`;
       html += `<g class="node" data-col="${col.id}" style="cursor:pointer">
         <circle cx="${x}" cy="${y}" r="6" fill="${space ? space.color : '#888'}"/>
         <text x="${x}" y="${y - 12}" text-anchor="middle" fill="var(--fg)" font-size="9" opacity="0.92">${esc(col.name.slice(0, 20))}</text>
-        <text x="${x}" y="${y + 18}" text-anchor="middle" fill="var(--fg-muted)" font-size="7.5">${col.bookmarks.length}</text>
+        <text x="${x}" y="${y + 18}" text-anchor="middle" fill="var(--fg-muted)" font-size="7.5">${colTotal(col)}</text>
       </g>`;
     });
 
@@ -774,14 +805,25 @@ function renderCanvas() {
 
   svg.innerHTML = html;
 
+  // Nivel 1 -> 2
+  svg.querySelectorAll('[data-office]').forEach(g => {
+    g.addEventListener('click', () => {
+      canvasLevel = 'departments';
+      canvasOffice = g.dataset.office;
+      renderCanvas();
+    });
+  });
+
+  // Nivel 2 -> 3
   svg.querySelectorAll('[data-space]').forEach(g => {
     g.addEventListener('click', () => {
-      canvasLevel = 'space';
+      canvasLevel = 'desktops';
       canvasSpace = g.dataset.space;
       renderCanvas();
     });
   });
 
+  // Nivel 3 -> tablero
   svg.querySelectorAll('[data-col]').forEach(g => {
     g.addEventListener('click', () => {
       state.ui.selectedCollection = g.dataset.col;
@@ -793,8 +835,13 @@ function renderCanvas() {
   const back = svg.querySelector('#canvasBack');
   if (back) {
     back.addEventListener('click', () => {
-      canvasLevel = 'spaces';
-      canvasSpace = null;
+      if (canvasLevel === 'desktops') {
+        canvasLevel = 'departments';
+        canvasSpace = null;
+      } else {
+        canvasLevel = 'offices';
+        canvasOffice = null;
+      }
       renderCanvas();
     });
   }
@@ -803,21 +850,16 @@ function renderCanvas() {
 /* ================================================================
    ACCIONES
    ================================================================ */
-/* Quita un bookmark de donde este, este en coleccion o carpeta */
+/* Quita un enlace de donde este, para poder moverlo a otro Escritorio */
 function detachBookmark(bmId) {
   for (const col of state.collections) {
     col.bookmarks = (col.bookmarks || []).filter(id => id !== bmId);
-    for (const f of (col.folders || [])) {
-      f.bookmarks = f.bookmarks.filter(id => id !== bmId);
-    }
   }
 }
 
-/* Todos los bookmarks de una coleccion, incluyendo los de sus carpetas */
+/* Todos los enlaces de un Escritorio */
 function allBookmarksOf(col) {
-  const ids = [...(col.bookmarks || [])];
-  for (const f of (col.folders || [])) ids.push(...f.bookmarks);
-  return ids.map(id => state.bookmarks[id]).filter(Boolean);
+  return (col.bookmarks || []).map(id => state.bookmarks[id]).filter(Boolean);
 }
 
 /* Edita SOLO el titulo de un bookmark. La URL nunca se toca.
@@ -889,31 +931,17 @@ function deleteBookmark(bmId) {
 }
 
 function deleteCollection(colId) {
-  if (!confirm('Eliminar esta coleccion y sus bookmarks?')) return;
+  if (!confirm('¿Eliminar este escritorio y sus enlaces?')) return;
   const col = state.collections.find(c => c.id === colId);
   if (col) allBookmarksOf(col).forEach(bm => delete state.bookmarks[bm.id]);
   state.collections = state.collections.filter(c => c.id !== colId);
   if (state.ui.selectedCollection === colId) {
     state.ui.selectedCollection = null;
-    state.ui.selectedFolder = null;
   }
   save(); render();
 }
 
-function deleteFolder(colId, folderId) {
-  const col = state.collections.find(c => c.id === colId);
-  if (!col) return;
-  const folder = (col.folders || []).find(f => f.id === folderId);
-  if (!folder) return;
-  if (!confirm(`Eliminar la carpeta "${folder.name}"?`)) return;
-  folder.bookmarks.forEach(id => delete state.bookmarks[id]);
-  col.folders = col.folders.filter(f => f.id !== folderId);
-  if (state.ui.selectedFolder === folderId) state.ui.selectedFolder = null;
-  save(); render();
-  toast('Carpeta eliminada');
-}
-
-/* Paleta de circulos para colecciones y carpetas */
+/* Paleta de circulos para Escritorios y Departamentos */
 const COLLECTION_COLORS = [
   '#e0563a', '#4a90e2', '#1a9e4b', '#f0a020', '#9b59b6', '#00a5a5',
   '#d94f8a', '#c0392b', '#16a085', '#8e44ad', '#d35400', '#27ae60'
@@ -923,22 +951,19 @@ function nextColor(index) {
   return COLLECTION_COLORS[index % COLLECTION_COLORS.length];
 }
 
-/* Crea una carpeta dentro de una coleccion */
-function addFolder(colId, name) {
-  const col = state.collections.find(c => c.id === colId);
-  if (!col) return;
-  if (!col.folders) col.folders = [];
-  const folder = {
-    id: genId('fld'),
-    name,
+/* Crea un Escritorio dentro de un Departamento */
+function createDesktop(spaceId, nombre) {
+  const colId = genId('col');
+  state.collections.push({
+    id: colId,
+    spaceId,
+    name: nombre,
+    color: nextColor(state.collections.length),
     bookmarks: [],
-    color: nextColor(col.folders.length)
-  };
-  col.folders.push(folder);
+    position: state.collections.length
+  });
   state.ui.selectedCollection = colId;
-  state.ui.selectedFolder = folder.id;
-  save(); render();
-  toast('Carpeta creada');
+  return colId;
 }
 
 function moveBookmark(bmId, toColId) {
@@ -947,15 +972,6 @@ function moveBookmark(bmId, toColId) {
   if (dest) dest.bookmarks.push(bmId);
   save(); render();
   toast('Bookmark movido');
-}
-
-function moveBookmarkToFolder(bmId, colId, folderId) {
-  detachBookmark(bmId);
-  const col = state.collections.find(c => c.id === colId);
-  const folder = col && (col.folders || []).find(f => f.id === folderId);
-  if (folder) folder.bookmarks.push(bmId);
-  save(); render();
-  toast('Bookmark movido a la carpeta');
 }
 
 async function addBookmarkToCollection(colId, url) {
@@ -976,44 +992,21 @@ async function addBookmarkToCollection(colId, url) {
   toast('Bookmark agregado');
 }
 
-async function addBookmarkToFolder(colId, folderId, url) {
-  let title = url;
-  let icon = '';
-  try {
-    const tab = await chrome.tabs.create({ url, active: false });
-    title = tab.title || url;
-    icon = tab.favIconUrl || '';
-    await chrome.tabs.remove(tab.id);
-  } catch (e) {}
-
-  const bmId = genId('bm');
-  state.bookmarks[bmId] = { id: bmId, title, url, icon, note: '', tags: [] };
-  const col = state.collections.find(c => c.id === colId);
-  const folder = col && (col.folders || []).find(f => f.id === folderId);
-  if (folder) folder.bookmarks.push(bmId);
-  save(); render();
-  toast('Bookmark agregado a la carpeta');
-}
-
-/* Reabre una coleccion como grupo de pestanas de Chrome */
+/* Reabre un Escritorio como grupo de pestanas de Chrome */
 async function openCollectionAsGroup(colId) {
   const col = state.collections.find(c => c.id === colId);
   if (!col) return;
 
-  // Si hay una carpeta seleccionada, abre solo esa
-  const folder = state.ui.selectedFolder
-    ? (col.folders || []).find(f => f.id === state.ui.selectedFolder)
-    : null;
-  const ids = folder ? folder.bookmarks : allBookmarksOf(col).map(b => b.id);
-  if (ids.length === 0) return;
+  const bms = allBookmarksOf(col);
+  if (bms.length === 0) { toast('Ese escritorio no tiene enlaces'); return; }
 
-  const urls = ids.map(id => state.bookmarks[id]).filter(Boolean).map(b => b.url);
+  const urls = bms.map(b => b.url);
   const tabIds = await chrome.tabs.create({ url: urls, active: false });
 
   // Agrupar si el navegador lo soporta
   try {
     await chrome.tabs.group({ tabIds, groupId: -1 });
-    await chrome.tabGroups.update(-1, { title: folder ? folder.name : col.name, color: 'blue' });
+    await chrome.tabGroups.update(-1, { title: col.name, color: 'blue' });
     await chrome.tabs.update(tabIds[0], { active: true });
   } catch (e) {
     toast('Abierto en pestanas separadas (sin agrupar)');
@@ -1048,7 +1041,7 @@ async function loadOpenTabs() {
     </div>
   `).join('');
 
-  // Arrastrar pestana abierta a una coleccion / click para enfocarla
+  // Arrastrar pestana abierta a un Escritorio / click para enfocarla
   list.querySelectorAll('.tab-item').forEach(item => {
     item.addEventListener('dragstart', e => {
       item.classList.add('dragging');
@@ -1062,34 +1055,87 @@ async function loadOpenTabs() {
   });
 }
 
-/* Captura la ventana actual como una nueva coleccion */
+/* Captura la ventana actual como un Escritorio nuevo */
 async function captureWindow() {
   const tabs = await chrome.tabs.query({ currentWindow: true });
   const valid = tabs.filter(t => t.url.startsWith('http'));
   if (valid.length === 0) { toast('No hay pestanas web abiertas'); return; }
 
-  const name = prompt('Nombre de la coleccion:', 'Session ' + new Date().toLocaleDateString('es'));
-  if (!name) return;
+  // Necesita un Departamento donde dejar el Escritorio
+  let spaceId = state.ui.selectedSpace;
+  if (!spaceId && state.spaces.length === 0) {
+    toast('Primero crea una Oficina y un Departamento');
+    return;
+  }
+  if (!spaceId) spaceId = state.spaces[0].id;
 
-  const spaceId = state.spaces[0]?.id || createDefaultSpace();
-  const colId = genId('col');
+  const space = state.spaces.find(s => s.id === spaceId);
+  const name = prompt(
+    `Nombre del escritorio en "${space ? space.name : ''}":`,
+    'Sesión ' + new Date().toLocaleDateString('es')
+  );
+  if (!name || !name.trim()) return;
+
   const bmIds = [];
-
   for (const t of valid) {
     const bmId = genId('bm');
     state.bookmarks[bmId] = { id: bmId, title: t.title || t.url, url: t.url, icon: t.favIconUrl || '', note: '', tags: [] };
     bmIds.push(bmId);
   }
 
-  state.collections.push({ id: colId, spaceId, name, color: nextColor(state.collections.length), bookmarks: bmIds, folders: [], position: state.collections.length });
+  const colId = createDesktop(spaceId, name.trim());
+  const col = state.collections.find(c => c.id === colId);
+  col.bookmarks = bmIds;
+
   save(); render();
-  toast(`${valid.length} pestanas capturadas`);
+  toast(`${valid.length} pestañas capturadas`);
 }
 
-function createDefaultSpace() {
-  const id = genId('sp');
-  state.spaces.push({ id, name: 'General', color: '#f65077' });
-  return id;
+/* Crea una Oficina nueva con su primer Departamento listo.
+   Si el usuario cancela el nombre, no se crea nada. */
+function createOffice() {
+  const nombre = prompt('Nombre de la nueva Oficina:');
+  if (!nombre || !nombre.trim()) return null;
+
+  const officeId = genId('of');
+  state.offices.push({
+    id: officeId,
+    name: nombre.trim(),
+    color: '#4a90e2',
+    shared: false
+  });
+
+  const spaceId = genId('sp');
+  state.spaces.push({
+    id: spaceId,
+    officeId,
+    name: 'General',
+    color: nextColor(state.spaces.length)
+  });
+
+  state.ui.selectedOffice = officeId;
+  save(); render();
+  toast('Oficina creada');
+  return officeId;
+}
+
+/* Crea un Departamento dentro de una Oficina */
+function createDepartment(officeId) {
+  const office = state.offices.find(o => o.id === officeId);
+  const nombre = prompt(`Nombre del nuevo departamento en "${office ? office.name : ''}":`);
+  if (!nombre || !nombre.trim()) return null;
+
+  const spaceId = genId('sp');
+  state.spaces.push({
+    id: spaceId,
+    officeId,
+    name: nombre.trim(),
+    color: nextColor(state.spaces.length)
+  });
+  state.ui.selectedOffice = officeId;
+  save(); render();
+  toast('Departamento creado');
+  return spaceId;
 }
 
 /* ================================================================
@@ -1148,13 +1194,6 @@ function pickFile() {
 
 function closeNewMenu() {
   document.getElementById('newMenu').classList.remove('show');
-}
-
-/* Pide el nombre de una carpeta y la crea en la coleccion indicada */
-function promptNewFolder(colId) {
-  const name = prompt('Nombre de la nueva carpeta:');
-  if (!name) return;
-  addFolder(colId, name.trim());
 }
 
 /* ================================================================
@@ -1258,12 +1297,12 @@ function bindEvents() {
       await save();
       render();
       const n = Object.keys(state.bookmarks).length;
-      toast(`Importados ${state.collections.length} colecciones · ${n} bookmarks`);
+      toast(`Importados ${state.spaces.length} departamentos · ${state.collections.length} escritorios · ${n} enlaces`);
     }
     e.target.value = '';
   });
 
-  // Menu "+ Nueva": Coleccion o Carpeta
+  // Menu "+ Nueva": Oficina, Departamento o Escritorio
   document.getElementById('btnNewCollection').addEventListener('click', (e) => {
     e.stopPropagation();
     const menu = document.getElementById('newMenu');
@@ -1273,26 +1312,38 @@ function bindEvents() {
     menu.classList.toggle('show');
   });
 
+  document.getElementById('menuNewOffice').addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeNewMenu();
+    createOffice();
+  });
+
   document.getElementById('menuNewCollection').addEventListener('click', (e) => {
     e.stopPropagation();
     closeNewMenu();
-    const name = prompt('Nombre del nuevo grupo:');
-    if (!name) return;
-    const spaceId = genId('sp');
-    state.spaces.push({ id: spaceId, name: name.trim(), color: nextColor(state.spaces.length) });
-    save(); render();
-    toast('Grupo creado');
-  });
-
-  document.getElementById('menuNewFolder').addEventListener('click', (e) => {
-    e.stopPropagation();
-    closeNewMenu();
-    const colId = state.ui.selectedCollection;
-    if (!colId) {
-      toast('Primero selecciona una coleccion');
+    if (state.offices.length === 0) {
+      toast('Primero crea una Oficina');
       return;
     }
-    promptNewFolder(colId);
+    // Se anade a la Oficina seleccionada, o a la primera si no hay ninguna abierta
+    const officeId = state.ui.selectedOffice || state.offices[0].id;
+    createDepartment(officeId);
+  });
+
+  document.getElementById('menuNewDesktop').addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeNewMenu();
+    let spaceId = state.ui.selectedSpace;
+    if (!spaceId) {
+      toast('Primero selecciona un Departamento');
+      return;
+    }
+    const space = state.spaces.find(s => s.id === spaceId);
+    const name = prompt(`Nombre del nuevo escritorio en "${space ? space.name : ''}":`);
+    if (!name || !name.trim()) return;
+    createDesktop(spaceId, name.trim());
+    save(); render();
+    toast('Escritorio creado');
   });
 
   // Cerrar el menu al hacer click fuera
@@ -1339,7 +1390,14 @@ function bindEvents() {
   document.getElementById('btnWipe').addEventListener('click', async () => {
     if (!confirm('Esto borra TODO. Incluye los datos guardados en GitHub si luego haces pull. Continuar?')) return;
     if (!confirm('Seguro? No se puede deshacer.')) return;
-    state = { spaces: [], collections: [], bookmarks: {}, settings: state.settings, ui: { search: '', selectedCollection: null } };
+    state = {
+      offices: [],
+      spaces: [],
+      collections: [],
+      bookmarks: {},
+      settings: state.settings,
+      ui: { search: '', selectedCollection: null, selectedOffice: null, selectedSpace: null }
+    };
     await save(); render();
     toast('Todo borrado');
   });

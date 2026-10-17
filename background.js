@@ -1,5 +1,5 @@
 /* Service worker: al hacer click en el icono, guarda la pestana
-   activa en la ultima coleccion, o abre la pagina de inicio. */
+   activa en el ultimo Escritorio, o abre la pagina de inicio. */
 
 chrome.action.onClicked.addListener(async (tab) => {
   // Si clicked en una pagina web, guardarla
@@ -8,12 +8,12 @@ chrome.action.onClicked.addListener(async (tab) => {
     const state = data.tablealo_v1;
 
     if (!state || !state.collections.length) {
-      // Sin colecciones: abrir la pagina nueva para que la configure
+      // Sin escritorios: abrir la pagina nueva para que la configure
       chrome.tabs.create({ url: chrome.runtime.getURL('newtab.html') });
       return;
     }
 
-    // Guardar en la coleccion seleccionada, o en la primera
+    // Guardar en el escritorio seleccionado, o en el primero
     const targetId = state.ui?.selectedCollection || state.collections[0].id;
     const target = state.collections.find(c => c.id === targetId) || state.collections[0];
 

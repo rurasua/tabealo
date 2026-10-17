@@ -202,19 +202,109 @@ body.tabs-hidden .tabs-panel { margin-right: calc(-1 * var(--tabs-w)); }
 
 .main { flex: 1; overflow-y: auto; position: relative; }
 
-/* ---- ESPACIOS Y COLECCIONES EN SIDEBAR ---- */
-.space { margin-bottom: 6px; }
+/* ---- OFICINAS (contenedor de Departamentos) ---- */
+.office { margin-bottom: 10px; }
+
+.office-header {
+  display: flex; align-items: center; gap: 7px;
+  padding: 8px 9px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--fg);
+  user-select: none;
+}
+.office-header:hover { background: var(--card-hover); }
+
+.office-chevron {
+  font-size: 9px;
+  color: var(--fg-muted);
+  transition: transform .15s;
+  flex-shrink: 0;
+}
+.office.open .office-chevron { transform: rotate(90deg); }
+
+.office-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.office-tag {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--fg-muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+
+.office-count { font-size: 11px; font-weight: 400; color: var(--fg-muted); }
+
+/* Boton + para crear un Departamento dentro de la Oficina */
+.office-add-dept {
+  width: 20px; height: 20px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--fg-muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: all .15s;
+}
+.office-header:hover .office-add-dept { opacity: 1; }
+.office-add-dept:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  transform: scale(1.12);
+}
+
+.office-body { display: none; padding-left: 8px; }
+.office.open .office-body { display: block; }
+
+.dept-empty {
+  padding: 6px 9px 8px 12px;
+  font-size: 11.5px;
+  color: var(--fg-muted);
+  font-style: italic;
+}
+
+/* Boton para crear una Oficina nueva */
+.new-office {
+  display: flex; align-items: center; gap: 7px;
+  width: 100%;
+  padding: 8px 9px;
+  margin-top: 4px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg-muted);
+  font-family: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.new-office:hover { color: var(--accent); border-color: var(--accent); background: var(--card-hover); }
+.new-office span { font-size: 14px; line-height: 1; }
+
+/* ---- DEPARTAMENTOS Y ESCRITORIOS EN SIDEBAR ---- */
+.space { margin-bottom: 4px; }
 .space-header {
   display: flex; align-items: center; gap: 7px;
   padding: 7px 9px;
   border-radius: 7px;
   cursor: pointer;
   font-weight: 600;
-  font-size: 12px;
+  font-size: 12.5px;
   user-select: none;
-  text-transform: uppercase;
-  letter-spacing: .04em;
-  color: var(--fg-muted);
+  color: var(--fg);
 }
 .space-header:hover { background: var(--card-hover); }
 .space-dot {
@@ -222,11 +312,12 @@ body.tabs-hidden .tabs-panel { margin-right: calc(-1 * var(--tabs-w)); }
   background: var(--accent);
   flex-shrink: 0;
 }
-.space-count { font-size: 11px; font-weight: 400; }
+.space-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.space-count { font-size: 11px; font-weight: 400; color: var(--fg-muted); }
 .space-chevron { font-size: 9px; transition: transform .15s; }
 .space.open .space-chevron { transform: rotate(90deg); }
 
-/* Boton + para crear coleccion dentro del grupo */
+/* Boton + para crear un Escritorio dentro del Departamento */
 .space-add {
   width: 20px; height: 20px;
   display: inline-flex; align-items: center; justify-content: center;
@@ -239,8 +330,10 @@ body.tabs-hidden .tabs-panel { margin-right: calc(-1 * var(--tabs-w)); }
   cursor: pointer;
   font-family: inherit;
   flex-shrink: 0;
+  opacity: 0;
   transition: all .15s;
 }
+.space-header:hover .space-add { opacity: 1; }
 .space-add:hover {
   background: var(--accent);
   border-color: var(--accent);
@@ -270,40 +363,8 @@ body.tabs-hidden .tabs-panel { margin-right: calc(-1 * var(--tabs-w)); }
 .collection-item .col-count { font-size: 11px; color: var(--fg-muted); }
 .collection-item.drop-target { background: var(--accent-soft); outline: 2px dashed var(--accent); }
 
-/* ---- COLECCIONES (desplegables cuando tienen carpetas) ---- */
-.col-group { margin-bottom: 1px; }
-.collection-item .chevron {
-  font-size: 9px;
-  transition: transform .15s;
-  color: var(--fg-muted);
-  flex-shrink: 0;
-}
-.collection-item .chevron.down { transform: rotate(90deg); }
-.collection-item .chevron.spacer { visibility: hidden; }
-.collection-item .col-icon { font-size: 13px; flex-shrink: 0; }
-
-/* ---- CARPETAS (hoja, dentro de la colección) ---- */
-.folder-group { margin: 0; }
-.folder-group-items { display: none; padding-left: 22px; }
-.folder-group.open .folder-group-items { display: block; }
-
-.folder-item {
-  display: flex; align-items: center; gap: 7px;
-  padding: 5px 9px;
-  border-radius: 7px;
-  cursor: pointer;
-  font-size: 12.5px;
-  color: var(--fg-muted);
-}
-.folder-item:hover { background: var(--card-hover); color: var(--fg); }
-.folder-item.active { background: var(--accent-soft); color: var(--accent); }
-.folder-item .col-icon { font-size: 12px; flex-shrink: 0; }
-.folder-item .col-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.folder-item .col-count { font-size: 10.5px; }
-.folder-item.drop-target { background: var(--accent-soft); outline: 2px dashed var(--accent); }
-
 /* ============================================================
-   VISTA TABLERO (grid de colecciones)
+   VISTA TABLERO (grid de escritorios)
    ============================================================ */
 .board {
   display: none;
@@ -339,45 +400,9 @@ body.view-board .empty { display: none; }
 .cc-actions .icon-btn { width: 26px; height: 26px; font-size: 13px; }
 
 .cc-list { max-height: 260px; overflow-y: auto; }
+
+/* Texto de un Escritorio vacio */
 .cc-empty { padding: 20px; text-align: center; color: var(--fg-muted); font-size: 12px; }
-.cc-empty.small { padding: 8px 14px 10px 34px; text-align: left; font-size: 11px; }
-
-/* Carpetas dentro de la card */
-.cc-folder {
-  border-bottom: 1px solid var(--border);
-  transition: background .12s;
-}
-.cc-folder:last-child { border-bottom: none; }
-.cc-folder.drop-target { background: var(--accent-soft); outline: 2px dashed var(--accent); outline-offset: -2px; }
-.cc-folder-header {
-  display: flex; align-items: center; gap: 7px;
-  padding: 7px 14px;
-  background: var(--bg);
-  cursor: pointer;
-}
-.cc-folder-header:hover { filter: brightness(.97); }
-.cc-folder-header .cc-folder-name {
-  font-size: 11.5px;
-  font-weight: 600;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-transform: uppercase;
-  letter-spacing: .03em;
-}
-.cc-folder-count { font-size: 10.5px; color: var(--fg-muted); }
-
-/* Etiqueta para bookmarks que no están en ninguna carpeta */
-.cc-subsection {
-  padding: 6px 14px;
-  font-size: 10.5px;
-  color: var(--fg-muted);
-  text-transform: uppercase;
-  letter-spacing: .04em;
-  background: var(--bg);
-  border-top: 1px solid var(--border);
-}
 
 .bm-row {
   display: flex; align-items: center; gap: 9px;

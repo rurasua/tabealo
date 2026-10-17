@@ -1,6 +1,6 @@
 # Tablealo
 
-Gestor de pestañas y bookmarks. **Tus datos en tu máquina, sin servidor, sin cuenta, sin cobros.**
+Gestor de pestañas y enlaces. **Tus datos en tu máquina, sin servidor, sin cuenta, sin cobros.**
 
 Inspirado en la idea de TheTab.Ninja y en las funcionalidades de Toby, pero con código propio y sin dependencias externas.
 
@@ -8,10 +8,10 @@ Inspirado en la idea de TheTab.Ninja y en las funcionalidades de Toby, pero con 
 
 ## Qué hace
 
-- **Importa el export JSON de Toby** (soporta v4): tus 22 espacios, 182 colecciones y 1,270 bookmarks entran en un click.
-- **Panel de pestañas abiertas**: arrastra cualquier pestaña abierta a una colección y se guarda.
-- **Capturar ventana completa**: convierte todo lo que tienes abierto en una colección nueva.
-- **Reabrir colección como grupo de pestañas** de Chrome.
+- **Importa el export JSON de Toby** (soporta v4): tus 22 Departamentos, 182 Escritorios y 1,270 enlaces entran en un click.
+- **Panel de pestañas abiertas**: arrastra cualquier pestaña abierta a un Escritorio y se guarda.
+- **Capturar ventana completa**: convierte todo lo que tienes abierto en un Escritorio nuevo.
+- **Reabrir Escritorio como grupo de pestañas** de Chrome.
 - **Búsqueda con operadores** (ver abajo).
 - **Vista tablero** (grid) y **vista mapa** (canvas con drill-down).
 - **Modo zen**: reloj + búsqueda sin distracciones.
@@ -21,46 +21,48 @@ Inspirado en la idea de TheTab.Ninja y en las funcionalidades de Toby, pero con 
 
 ---
 
-## Estructura del sidebar
+## La jerarquía
+
+Cuatro niveles, sin carpetas:
 
 ```
-▼ ● MY COLLECTIONS   2 · 2  (+)    ← Grupo: círculo + botón + para crear colecciones
-    ▶ 📁 A-FRAME                    ← Colección: ícono 📁, desplegable si tiene carpetas
-         🗂 Canchas                   ← Carpeta: ícono 🗂, hoja final
-      📁 FRAUDES                     ← Sin chevron si no tiene carpetas
-▼ ● HOME4           14 · 65  (+)
-    📁 CASAS CONTENEDOR
-▼ ● PROYECTO NUEVO   0 · 0  (+)
+Oficina
+└── Departamento      (círculo de color)
+    └── Escritorio    (el nombre lo pones tú)
+        └── Enlace
 ```
 
-| Nivel | Chevron | Ícono | Botón + | Color |
+| Nivel | Chevron | Ícono | Botón `+` | Color |
 |---|---|---|---|---|
-| Grupo | Sí | ● círculo | **Sí** (crea colecciones) | Sí |
-| Colección | Si tiene carpetas | 📁 | No | No |
-| Carpeta | No | 🗂 | No | No |
+| Oficina | Sí | 🏢 nombre en mayúsculas | **Sí** (crea Departamento) | No |
+| Departamento | Sí | ● círculo | **Sí** (crea Escritorio) | Sí |
+| Escritorio | No | 🖥️ | No | No |
+
+Un enlace se guarda **directo** en su Escritorio. No hay carpetas intermedias: un solo nivel de agrupación debajo del Escritorio, que es justo lo que hace falta.
 
 ---
 
-## Crear grupos, colecciones y carpetas
+## Crear Offices, Departamentos y Escritorios
 
 **`+ Nueva`** (arriba a la izquierda) abre el menú:
 
 | Opción | Qué hace |
 |---|---|
-| **Nuevo Grupo** | Crea un espacio nuevo con su propio color |
-| **Nueva Carpeta** | Crea una subcarpeta dentro de la colección seleccionada |
+| **Nueva Oficina** | Crea una Oficina con su primer Departamento listo |
+| **Nuevo Departamento** | Crea un Departamento con su círculo de color en la Oficina seleccionada |
+| **Nuevo Escritorio** | Crea un Escritorio con el nombre que quieras en el Departamento seleccionado |
 
-**El botón `+` junto al nombre de cada Grupo** crea una colección dentro de ese grupo. El prompt te dice en cuál lo estás haciendo.
+**El botón `+` junto al nombre de cada Oficina** crea un Departamento dentro de esa Oficina.
+**El botón `+` junto al nombre de cada Departamento** crea un Escritorio dentro de ese Departamento.
 
-Para crear una **carpeta**: selecciona la colección en el sidebar, luego entra a la tarjeta del tablero y usa el ícono 🗂 en la esquina superior derecha.
+El prompt siempre te dice en cuál lo estás haciendo, para que nunca crees algo donde no querías.
 
-**Borrar:** cada carpeta tiene una ✕ a la derecha de su nombre en el tablero. Al entrar a una carpeta, el 🗑 de arriba borra la carpeta, no la colección. El botón **←** te regresa a la colección.
+**Borrar:** el 🗑 de una tarjeta del tablero borra ese Escritorio con todos sus enlaces. El ✕ en cada fila borra solo ese enlace. El 🗑 de un Departamento u Oficina se agrega en una fase posterior.
 
 **Arrastrar para organizar:**
 
-- Arrastra un bookmark a una carpeta → se mueve a la carpeta
-- Arrastra un bookmark a otra colección → cambia de colección
-- Arrastra una pestaña abierta del panel derecho a una carpeta o colección → se guarda ahí
+- Arrastra un enlace a otro Escritorio → cambia de Escritorio
+- Arrastra una pestaña abierta del panel derecho a un Escritorio → se guarda ahí
 
 ---
 
@@ -76,13 +78,19 @@ Para fijar el ícono en la barra: click derecho en la barra de pestañas → **F
 
 ---
 
-## Importar tus bookmarks de Toby
+## Importar tus enlaces de Toby
 
 1. En Toby: **Account Settings → Export → JSON**
 2. En Tablealo: click en **Importar** y selecciona ese `.json`
-3. Verás el toast `Importados 182 colecciones · 1270 bookmarks`
+3. Verás el toast `Importados 22 departamentos · 182 escritorios · 1270 enlaces`
 
-Los grupos de Toby se convierten en **espacios** (sección izquierda del sidebar).
+El importador mapea así:
+
+| Toby | Tablealo |
+|---|---|
+| `groups` | Departamentos (dentro de una sola Oficina llamada "Importado de Toby") |
+| `lists` | Escritorios |
+| `cards` | Enlaces, directos en su Escritorio |
 
 ---
 
@@ -90,9 +98,9 @@ Los grupos de Toby se convierten en **espacios** (sección izquierda del sidebar
 
 | Operador | Qué hace | Ejemplo |
 |---|---|---|
-| `texto` | Busca en la colección seleccionada | `SIP` |
-| `%texto` | Busca en **todas** las colecciones | `%membrana` |
-| `#texto` | Busca solo por **nombre de colección** | `#panel` |
+| `texto` | Busca en el Escritorio seleccionado | `SIP` |
+| `%texto` | Busca en **todos** los Escritorios | `%membrana` |
+| `#texto` | Busca solo por **nombre de Escritorio** | `#panel` |
 | `@tag` | Busca por etiqueta | `@construcción` |
 | `a\|b` | OR: encuentra cualquiera de los dos | `termo\|solar` |
 | `?texto` | Abre Google con esa búsqueda | `?presupuesto SIP` |
@@ -104,9 +112,10 @@ Atajo: `Ctrl+K` para saltar al buscador. `Esc` limpia.
 
 ## Vista mapa (canvas)
 
-- Click en un **espacio** → ves sus colecciones alrededor
-- Click en una **colección** → la seleccionas y vuelves al tablero
-- Click en "volver a todos los espacios" → regresas al nivel 1
+- Click en una **Oficina** → ves sus Departamentos
+- Click en un **Departamento** → ves sus Escritorios
+- Click en un **Escritorio** → lo seleccionas y vuelves al tablero
+- Usa "volver a los departamentos" / "volver a todas las oficinas" para subir de nivel
 - Arrastra el fondo para moverte, rueda para zoom, botones `+` `−` `⤢`
 
 ---
@@ -119,6 +128,8 @@ Atajo: `Ctrl+K` para saltar al buscador. `Esc` limpia.
 4. **Subir a GitHub** = sube tu estado. **Bajar de GitHub** = lo restaura.
 
 El archivo en GitHub es un solo `tablealo.json` en tu repo. Nadie más lo ve.
+
+El **exportar JSON** sigue existiendo siempre y es el respaldo que nunca depende de nadie.
 
 ---
 
@@ -138,17 +149,20 @@ Tablealo/
 - Todo vive en un objeto `state` en memoria.
 - Cada cambio llama a `save()`, que escribe en `chrome.storage.local`.
 - `render()` vuelve a pintar la vista desde el estado.
-- El import de Toby mapea `groups → espacios`, `lists → colecciones`, `cards → bookmarks`.
+- El import de Toby mapea `groups → Departamentos`, `lists → Escritorios`, `cards → enlaces`.
 
 **Modelo de datos:**
 
 ```js
-state.spaces      = [{ id, name, color }]
-state.collections = [{ id, spaceId, name, bookmarks: [ids], folders: [...] }]
+state.offices     = [{ id, name, color, shared }]
+state.spaces      = [{ id, officeId, name, color }]      // Departamentos
+state.collections = [{ id, spaceId, name, bookmarks: [ids] }]  // Escritorios
 state.bookmarks   = { id, title, url, icon, note, tags: [] }
 ```
 
-Un bookmark vive exactamente en un lugar: o en `collection.bookmarks` (suelto) o en `collection.folders[].bookmarks` (dentro de una carpeta). `detachBookmark()` lo saca de donde esté antes de moverlo, para que nunca quede duplicado.
+Los nombres internos `spaces` y `collections` son históricos: en la interfaz esos niveles se llaman **Departamento** y **Escritorio**. No hay carpetas en el modelo.
+
+Un enlace vive exactamente en un Escritorio. `detachBookmark()` lo saca de donde esté antes de moverlo, para que nunca quede duplicado.
 
 ---
 
