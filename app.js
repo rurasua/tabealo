@@ -8,7 +8,7 @@
    - las acciones mutan state y luego llaman render()
    ================================================================ */
 
-const STORAGE_KEY = 'tabvault_v1';
+const STORAGE_KEY = 'tablealo_v1';
 
 /* Modelo de datos:
    spaces      = [{ id, name, color }]
@@ -46,12 +46,20 @@ async function load() {
   if (hasChromeStorage) {
     const data = await chrome.storage.local.get(STORAGE_KEY);
     if (data[STORAGE_KEY]) state = data[STORAGE_KEY];
+
+    // Limpieza: la extension antes se llamaba TabVault y guardaba en
+    // 'tabvault_v1'. Ese cajon ya no se usa; lo borramos para no dejarlo
+    // ocupando espacio ni confundir a nadie.
+    chrome.storage.local.get('tabvault_v1', (old) => {
+      if (old && old.tabvault_v1) chrome.storage.local.remove('tabvault_v1');
+    });
   } else {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       try { state = JSON.parse(raw); }
       catch (e) { toast('Datos locales corruptos, empezando limpio'); }
     }
+    localStorage.removeItem('tabvault_v1');
   }
   applyTheme();
   applyBackground();

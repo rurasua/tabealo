@@ -4,8 +4,8 @@
 chrome.action.onClicked.addListener(async (tab) => {
   // Si clicked en una pagina web, guardarla
   if (tab.url && tab.url.startsWith('http')) {
-    const data = await chrome.storage.local.get('tabvault_v1');
-    const state = data.tabvault_v1;
+    const data = await chrome.storage.local.get('tablealo_v1');
+    const state = data.tablealo_v1;
 
     if (!state || !state.collections.length) {
       // Sin colecciones: abrir la pagina nueva para que la configure
@@ -28,7 +28,7 @@ chrome.action.onClicked.addListener(async (tab) => {
     };
     target.bookmarks.push(bmId);
 
-    await chrome.storage.local.set({ tabvault_v1: state });
+    await chrome.storage.local.set({ tablealo_v1: state });
     chrome.tabs.create({ url: chrome.runtime.getURL('newtab.html') });
   }
 });
