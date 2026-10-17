@@ -57,7 +57,9 @@ Un enlace se guarda **directo** en su Escritorio. No hay carpetas intermedias: u
 
 El prompt siempre te dice en cuál lo estás haciendo, para que nunca crees algo donde no querías.
 
-**Borrar:** el 🗑 de una tarjeta del tablero borra ese Escritorio con todos sus enlaces. El ✕ en cada fila borra solo ese enlace. El 🗑 de un Departamento u Oficina se agrega en una fase posterior.
+**Borrar:** los 🗑 del encabezado de cada Oficina y de cada Departamento los eliminan junto con todo lo que tienen dentro. Antes de hacerlo, la confirmación te dice exactamente cuántos departamentos, escritorios y enlaces se van a perder. El 🗑 de una tarjeta del tablero borra ese Escritorio con todos sus enlaces, y el ✕ en cada fila borra solo ese enlace.
+
+Los botones 🗑 solo aparecen cuando pones el cursor encima del encabezado, para que no estorben al leer los nombres.
 
 **Arrastrar para organizar:**
 
