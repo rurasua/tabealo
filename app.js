@@ -277,7 +277,14 @@ function parseQuery(raw) {
   if (t.startsWith('%')) return { type: 'global', term: t.slice(1).toLowerCase() };
   if (t.startsWith('?')) return { type: 'google', term: t.slice(1) };
   if (t.startsWith('!')) return { type: 'chatgpt', term: t.slice(1) };
-  if (t.startsWith('@')) return { type: 'tag', term: t.slice(1).toLowerCase() };
+  // @nota texto busca SOLO dentro de las notas. Cualquier otro @ es un tag.
+  if (t.startsWith('@')) {
+    const resto = t.slice(1);
+    if (/^nota\b/.test(resto)) {
+      return { type: 'note', term: resto.slice(4).trim().toLowerCase() };
+    }
+    return { type: 'tag', term: resto.toLowerCase() };
+  }
   return { type: 'bookmarks', term: t.toLowerCase() };
 }
 
@@ -335,6 +342,15 @@ function searchResults(query) {
       const hits = col.bookmarks
         .map(id => state.bookmarks[id])
         .filter(b => b && (b.tags || []).some(tag => tag.toLowerCase() === q.term));
+      if (hits.length) out.push({ type: 'collection', collection: col, space, bookmarks: hits });
+    }
+
+    // @nota busca solo dentro del texto de las notas
+    if (q.type === 'note') {
+      if (!q.term) continue;
+      const hits = col.bookmarks
+        .map(id => state.bookmarks[id])
+        .filter(b => b && (b.note || '').toLowerCase().includes(q.term));
       if (hits.length) out.push({ type: 'collection', collection: col, space, bookmarks: hits });
     }
   }
@@ -603,10 +619,22 @@ function renderBoard() {
   if (state.ui.selectedCollection) {
     collectionsToShow = state.collections.filter(c => c.id === state.ui.selectedCollection);
   }
+
+  // Cuando hay busqueda guardamos WHICH enlaces coincidieron en cada
+  // Escritorio, para no mostrar los otros 1,269 de un solo Escritorio.
+  let hitsPorCol = null;
   if (q) {
-    // En busqueda, mostrar solo escritorios con coincidencias
-    collectionsToShow = searchResults(q).map(r => r.collection);
+    const res = searchResults(q);
+    collectionsToShow = res.map(r => r.collection);
+    hitsPorCol = new Map();
+    res.forEach(r => {
+      if (r.bookmarks) hitsPorCol.set(r.collection.id, new Set(r.bookmarks.map(b => b.id)));
+    });
   }
+
+  // Al buscar con @nota las notas se abren solas: si no, no se ve
+  // POR QUE aparecio el enlace en los resultados.
+  const abrirNotas = /^@nota\b/i.test(q);
 
   if (collectionsToShow.length === 0) {
     board.innerHTML = '';
@@ -615,14 +643,20 @@ function renderBoard() {
 
   board.innerHTML = collectionsToShow.map(col => {
     const space = state.spaces.find(s => s.id === col.spaceId);
-    const bms = (col.bookmarks || []).map(id => state.bookmarks[id]).filter(Boolean);
+    let bms = (col.bookmarks || []).map(id => state.bookmarks[id]).filter(Boolean);
+
+    // En busqueda, quedate solo con los enlaces que coincidieron
+    if (hitsPorCol && hitsPorCol.has(col.id)) {
+      const set = hitsPorCol.get(col.id);
+      bms = bms.filter(b => set.has(b.id));
+    }
 
     // Cada enlace ocupa TRES bloques: su fila, el panel de la nota
     // desplegada y el editor para escribirla. Van juntos para que la nota
     // aparezca justo debajo de la fila que le pertenece.
     const rowHtml = (bm) => {
       const nota = (bm.note || '').trim();
-      const abierta = notasAbiertas.has(bm.id);
+      const abierta = abrirNotas || notasAbiertas.has(bm.id);
       const editando = notaEnEdicion === bm.id;
       return `
       <div class="bm-row" data-bm="${bm.id}" data-url="${esc(bm.url)}" draggable="true">

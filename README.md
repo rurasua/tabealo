@@ -124,11 +124,14 @@ Las notas **no se guardan** en el estado de la vista: al recargar la página vue
 | `%texto` | Busca en **todos** los Escritorios | `%membrana` |
 | `#texto` | Busca solo por **nombre de Escritorio** | `#panel` |
 | `@tag` | Busca por etiqueta | `@construcción` |
+| `@nota texto` | Busca **solo dentro de las notas** | `@nota youtube` |
 | `a\|b` | OR: encuentra cualquiera de los dos | `termo\|solar` |
 | `?texto` | Abre Google con esa búsqueda | `?presupuesto SIP` |
 | `!texto` | Abre ChatGPT con esa pregunta | `!qué es SIP` |
 
 Atajo: `Ctrl+K` para saltar al buscador. `Esc` limpia.
+
+Con `@nota` el tablero muestra **solo los enlaces que coinciden** y les despliega la nota al instante, para que veas por qué salió cada resultado. Cualquier otro `@` sigue siendo una etiqueta.
 
 ---
 
